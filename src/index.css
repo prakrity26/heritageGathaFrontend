@@ -1,0 +1,216 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400;1,700&family=Manrope:wght@300;400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@layer base {
+	body {
+		font-family: "Manrope", sans-serif;
+		background-color: #f7f9ff;
+		color: #0d1d2a;
+		margin: 0;
+		padding: 0;
+	}
+
+	#root {
+		width: 100%;
+		min-height: 100vh;
+	}
+}
+
+@layer components {
+	.font-serif {
+		font-family: "Noto Serif", serif;
+	}
+
+	/* Material Symbols Icon */
+	.material-symbols-outlined {
+		font-variation-settings:
+			"FILL" 0,
+			"wght" 400,
+			"GRAD" 0,
+			"opsz" 24;
+		user-select: none;
+		display: inline-block;
+	}
+
+	.material-symbols-outlined.filled {
+		font-variation-settings:
+			"FILL" 1,
+			"wght" 400,
+			"GRAD" 0,
+			"opsz" 24;
+	}
+}
+
+@layer utilities {
+	/* Utilities */
+	.artifact-gradient {
+		background: linear-gradient(135deg, #823b18 0%, #a0522d 100%);
+	}
+
+	.glass-panel {
+		background: rgba(247, 249, 255, 0.7);
+		backdrop-filter: blur(20px);
+	}
+
+	.artifact-shadow {
+		box-shadow: 0px 20px 40px rgba(13, 29, 42, 0.05);
+	}
+
+	.hide-scrollbar::-webkit-scrollbar {
+		display: none;
+	}
+
+	.hide-scrollbar {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+
+	.custom-scrollbar::-webkit-scrollbar {
+		width: 4px;
+	}
+
+	.custom-scrollbar::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.custom-scrollbar::-webkit-scrollbar-thumb {
+		background: #dac1b8;
+		border-radius: 10px;
+	}
+}
+
+/* Modern Scan Button Animations */
+@keyframes wave {
+	0% {
+		width: 0;
+		height: 0;
+		opacity: 0.8;
+		border-width: 3px;
+	}
+	100% {
+		width: 120px;
+		height: 120px;
+		opacity: 0;
+		border-width: 1px;
+	}
+}
+
+@keyframes rotate-ring {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes glow-pulse {
+	0%,
+	100% {
+		box-shadow:
+			0 0 20px rgba(130, 59, 24, 0.4),
+			0 0 40px rgba(130, 59, 24, 0.2),
+			inset 0 0 20px rgba(255, 255, 255, 0.1);
+	}
+	50% {
+		box-shadow:
+			0 0 40px rgba(130, 59, 24, 0.8),
+			0 0 80px rgba(130, 59, 24, 0.4),
+			inset 0 0 20px rgba(255, 255, 255, 0.2);
+	}
+}
+
+@keyframes float-up {
+	0% {
+		transform: translateY(0px);
+		opacity: 0;
+	}
+	50% {
+		opacity: 1;
+	}
+	100% {
+		transform: translateY(-60px);
+		opacity: 0;
+	}
+}
+
+@keyframes particle-float {
+	0% {
+		transform: translate(0, 0) scale(1);
+		opacity: 1;
+	}
+	100% {
+		transform: translate(var(--tx), var(--ty)) scale(0);
+		opacity: 0;
+	}
+}
+
+@keyframes gradient-shift {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+@keyframes shimmer {
+	0% {
+		background-position: -1000px 0;
+	}
+	100% {
+		background-position: 1000px 0;
+	}
+}
+
+@keyframes scan-line-move {
+	0% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(70vh);
+	}
+	100% {
+		transform: translateY(0);
+	}
+}
+
+.pulse-wave {
+	animation: wave 1.5s ease-out infinite;
+}
+
+.rotate-ring {
+	animation: rotate-ring 3s linear infinite;
+}
+
+.glow-pulse {
+	animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.float-particle {
+	animation: float-up 2s ease-out infinite;
+}
+
+.gradient-btn {
+	background-size: 200% 200%;
+	animation: gradient-shift 3s ease infinite;
+}
+
+.shimmer-effect {
+	background-size: 1000px 100%;
+	animation: shimmer 3s infinite;
+}
+
+.scan-line {
+	animation: scan-line-move 2.5s ease-in-out infinite;
+}
+
+/* Hide header when camera is open */
+body.camera-open header {
+	display: none !important;
+}
