@@ -1,16 +1,30 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { login } from "../store/authSlice";
+import { useDispatch, useSelector } from "react-redux";
+import {
+	verifyOTPStart,
+	verifyOTPSuccess,
+	verifyOTPFailure,
+	loginSuccess,
+	clearError,
+} from "../store/authSlice";
+import authService from "../services/auth.service";
 
+/**
+ * OTP Verification Page
+ * Handles email verification after registration
+ * Production-level implementation with proper error handling and loading states
+ */
 export default function OTPVerification() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const dispatch = useDispatch();
 
+	// Redux state selectors
+	const { loading, error } = useSelector((state) => state.auth);
+
 	const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-	const [error, setError] = useState("");
-	const [isVerifying, setIsVerifying] = useState(false);
+	const [localError, setLocalError] = useState("");
 	const [isResending, setIsResending] = useState(false);
 	const [timer, setTimer] = useState(60);
 	const [canResend, setCanResend] = useState(false);
@@ -18,6 +32,12 @@ export default function OTPVerification() {
 
 	// Get email from navigation state
 	const email = location.state?.email || "";
+
+	// Clear errors when user interacts
+	const clearErrors = () => {
+		setLocalError("");
+		dispatch(clearError());
+	};
 
 	// Resend timer countdown
 	useEffect(() => {
@@ -37,6 +57,7 @@ export default function OTPVerification() {
 		const newOtp = [...otp];
 		newOtp[index] = value;
 		setOtp(newOtp);
+		clearErrors();
 
 		// Auto-focus next input
 		if (value && index < 5) {
@@ -56,67 +77,78 @@ export default function OTPVerification() {
 		const otpCode = otp.join("");
 
 		if (otpCode.length !== 6) {
-			setError("Please enter all 6 digits");
+			setLocalError("Please enter all 6 digits");
 			return;
 		}
 
-		setIsVerifying(true);
-		setError("");
+		clearErrors();
 
 		try {
-			// API call to verify OTP
-			// POST /api/v1/auth/verify-otp
-			const response = await fetch("/api/v1/auth/verify-otp", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ email, otp: otpCode }),
-			});
+			dispatch(verifyOTPStart());
 
-			const data = await response.json();
+			// Call authentication service
+			const result = await authService.verifyOTP(email, otpCode);
 
-			if (!response.ok) {
-				setError(data.message || "Invalid OTP. Please try again.");
-				return;
-			}
+			if (result.success) {
+				// Dispatch success action
+				const userData = result.data;
+				dispatch(
+					verifyOTPSuccess({
+						message: result.message,
+					}),
+				);
 
-			// On success, save token and redirect
-			if (data.status === "success") {
-				localStorage.setItem("token", data.data.token);
-				dispatch(login({ ...data.data.user }));
-				navigate("/");
+				// Dispatch login success to update auth state
+				dispatch(
+					loginSuccess({
+						user: userData.user || {
+							id: userData.id,
+							full_name: userData.full_name,
+							email: userData.email,
+							role: userData.role || "USER",
+							nationality: userData.nationality,
+							verified: true,
+						},
+						accessToken: userData.accessToken,
+						refreshToken: userData.refreshToken,
+					}),
+				);
+
+				// Navigate to home after short delay
+				setTimeout(() => {
+					navigate("/");
+				}, 500);
+			} else {
+				dispatch(verifyOTPFailure(result.message));
+				setLocalError(result.message);
 			}
 		} catch (err) {
-			setError("Network error. Please try again.");
-		} finally {
-			setIsVerifying(false);
+			const errorMsg = err.message || "An unexpected error occurred";
+			dispatch(verifyOTPFailure(errorMsg));
+			setLocalError(errorMsg);
 		}
 	};
 
 	// Resend OTP
 	const handleResendOtp = async () => {
+		clearErrors();
 		setIsResending(true);
-		setError("");
 
 		try {
-			// API call to resend OTP
-			// POST /api/v1/auth/resend-otp
-			const response = await fetch("/api/v1/auth/resend-otp", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ email }),
-			});
+			// Call authentication service
+			const result = await authService.resendOTP(email);
 
-			const data = await response.json();
-
-			if (response.ok && data.status === "success") {
+			if (result.success) {
+				// Reset OTP inputs and restart timer
 				setOtp(["", "", "", "", "", ""]);
 				setTimer(60);
 				setCanResend(false);
 			} else {
-				setError(data.message || "Failed to resend OTP.");
+				setLocalError(result.message);
 			}
 		} catch (err) {
-			setError("Network error. Please try again.");
+			const errorMsg = err.message || "An unexpected error occurred";
+			setLocalError(errorMsg);
 		} finally {
 			setIsResending(false);
 		}
@@ -168,21 +200,22 @@ export default function OTPVerification() {
 								}
 								onKeyDown={(e) => handleKeyDown(index, e)}
 								onKeyPress={handleKeyPress}
+								disabled={loading || isResending}
 								className={`w-full h-14 text-center text-2xl font-bold rounded-xl border-2 transition-all ${
 									digit
 										? "border-primary bg-primary/5"
 										: "border-outline bg-surface-container-low"
-								} focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20`}
+								} focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50`}
 							/>
 						))}
 					</div>
 
-					{error && (
+					{(error || localError) && (
 						<div className="flex items-center gap-2 p-3 bg-error/10 text-error rounded-lg text-sm">
 							<span className="material-symbols-outlined text-sm">
 								error
 							</span>
-							{error}
+							{error || localError}
 						</div>
 					)}
 				</div>
@@ -190,14 +223,12 @@ export default function OTPVerification() {
 				{/* Verify Button */}
 				<button
 					onClick={handleVerify}
-					disabled={isVerifying || otp.join("").length !== 6}
+					disabled={loading || otp.join("").length !== 6}
 					className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3 px-4 rounded-xl transition-all duration-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
 				>
-					{isVerifying ? (
+					{loading ? (
 						<>
-							<span className="material-symbols-outlined animate-spin">
-								loading
-							</span>
+							<span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
 							Verifying...
 						</>
 					) : (
@@ -218,14 +249,12 @@ export default function OTPVerification() {
 					{canResend ? (
 						<button
 							onClick={handleResendOtp}
-							disabled={isResending}
-							className="text-primary font-bold hover:text-primary-container transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mx-auto"
+							disabled={isResending || loading}
+							className="text-primary font-bold hover:text-primary-container transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
 						>
 							{isResending ? (
 								<>
-									<span className="material-symbols-outlined text-sm animate-spin">
-										loading
-									</span>
+									<span className="inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
 									Sending...
 								</>
 							) : (
@@ -252,8 +281,13 @@ export default function OTPVerification() {
 					<p className="text-xs text-on-surface-variant text-center">
 						Having trouble?{" "}
 						<button
-							onClick={() => navigate("/login")}
-							className="text-tertiary font-bold hover:underline"
+							type="button"
+							onClick={() => {
+								navigate("/");
+								dispatch(clearError());
+							}}
+							className="text-tertiary font-bold hover:underline disabled:opacity-50"
+							disabled={loading || isResending}
 						>
 							Go back to login
 						</button>

@@ -1,55 +1,22 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { login } from "../store/authSlice";
+import { useDispatch, useSelector } from "react-redux";
+import {
+	loginStart,
+	loginSuccess,
+	loginFailure,
+	registerStart,
+	registerSuccess,
+	registerFailure,
+	clearError,
+} from "../store/authSlice";
+import authService from "../services/auth.service";
 
-// ============================================================================
-// EXPECTED API CONTRACTS (FOR BACKEND TEAM) & SECURITY CONTEXT
-// ============================================================================
-//
-// SECURITY CONSIDERATIONS & THREAT MITIGATION:
-// 1. Session Management (Crucial against XSS): Avoid storing JWTs in localStorage. Backend MUST issue `HttpOnly`, `Secure`, `SameSite=Strict` cookies for authentication tokens.
-// 2. CSRF Protection: Backend must implement an Anti-CSRF token pattern for all state-changing operations (/login, /register).
-// 3. Brute Force & Credential Stuffing: Implement rigorous rate-limiting recursively (e.g., max 5 attempts per 15 mins per IP/User) on authentication endpoints.
-// 4. SQL/NoSQL Injection: All backend endpoints must strictly use Parameterized Queries or secure ORMs. Validate and sanitize every input string.
-// 5. Password Hashing: Backend must strictly store passwords using heavily peppered modern algorithms (Argon2id or bcrypt).
-// 6. Data Validation: Ensure strict regex validation for emails. Both frontend and backend must enforce password strength (e.g., min. 8 characters, mixed case, numbers, special characters).
-//
-// API: POST /api/v1/auth/login
-// Description: Authenticates user credentials and sets an HttpOnly cookie session.
-/*
-Expected Request Headers: { "X-CSRF-Token": "string", "Content-Type": "application/json" }
-Expected Request Body: { 
-	email: "user@example.com (sanitized, validated format)", 
-	password: "raw_password", 
-	keepAuth: boolean 
-}
-Expected Response Success (200 OK): 
-	{ 
-		status: "success", 
-		user: { id: "uuid", name: "string", email: "string", role: "user|admin" } 
-	} // Tokens are handled intrinsically by the browser via 'Set-Cookie' header
-Expected Response Error (401 Unauthorized / 429 Too Many Requests): 
-	{ error: "Invalid credentials" | "Rate limit exceeded" }
-*/
-
-// API: POST /api/v1/auth/register
-// Description: Registers a new user with strict data sanitization and password verification.
-/*
-Expected Request Headers: { "X-CSRF-Token": "string", "Content-Type": "application/json" }
-Expected Request Body: { 
-	name: "string (max 100 chars)", 
-	email: "user@example.com (validated uniquely)", 
-	nationality: "string", 
-	password: "raw_password (complex)", 
-	confirmPassword: "raw_password (verified to match password)" 
-}
-Expected Response Success (201 Created): 
-	{ status: "success", user: { id: "uuid", name: "string" } }
-Expected Response Error (400 Bad Request / 409 Conflict): 
-	{ error: "Validation failed" | "Email already in use" }
-*/
-
+/**
+ * Login & Registration Page
+ * Handles user authentication flow with register and login
+ * Professional implementation with proper error handling and loading states
+ */
 export default function Login() {
 	const [activeTab, setActiveTab] = useState("signin");
 	const [showPassword, setShowPassword] = useState(false);
@@ -57,93 +24,169 @@ export default function Login() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const dispatch = useDispatch();
-	const [errorMsg, setErrorMsg] = useState("");
 
-	// Sign In Form
+	// Redux state selectors
+	const { loading, error, successMessage, isLoggedIn } = useSelector(
+		(state) => state.auth,
+	);
+
+	// Sign In Form State
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [keepAuth, setKeepAuth] = useState(false);
+	const [localError, setLocalError] = useState("");
 
-	// Sign Up Form
+	// Sign Up Form State
 	const [signupName, setSignupName] = useState("");
 	const [signupEmail, setSignupEmail] = useState("");
 	const [signupNationality, setSignupNationality] = useState("");
 	const [signupPassword, setSignupPassword] = useState("");
 	const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+	const [signupLocalError, setSignupLocalError] = useState("");
 
-	const handleLoginFunc = (e) => {
+	// Clear error when user interacts with form
+	const clearErrors = () => {
+		setLocalError("");
+		dispatch(clearError());
+	};
+
+	const clearSignupErrors = () => {
+		setSignupLocalError("");
+		dispatch(clearError());
+	};
+
+	/**
+	 * Handle User Login
+	 */
+	const handleLoginSubmit = async (e) => {
 		e.preventDefault();
-		setErrorMsg("");
+		clearErrors();
 
-		// TODO: REPLACE THIS WITH ACTUAL API CALL ONCE INTEGRATED
-		// e.g., const res = await fetch('/api/v1/auth/login', { ... });
-		// const data = await res.json();
+		// Client-side validation
+		if (!email || !password) {
+			setLocalError("Please enter your email and password");
+			return;
+		}
 
-		if (email === "admin" && password === "admin") {
-			// Mocking Admin role
-			dispatch(
-				login({ id: "1", name: "System Admin", role: "admin", email }),
-			);
-			navigate("/admin/dashboard");
-		} else if (email === "user" && password === "user") {
-			// Mocking Standard role
-			dispatch(
-				login({ id: "2", name: "Standard User", role: "user", email }),
-			);
-			const returnUrl = location.state?.returnUrl || "/";
-			navigate(returnUrl);
-		} else {
-			setErrorMsg(
-				"Invalid credentials. Hint: use admin/admin or user/user",
-			);
+		try {
+			dispatch(loginStart());
+
+			// Call authentication service
+			const result = await authService.login(email, password);
+
+			if (result.success) {
+				// Dispatch success action
+				const userData = result.data;
+				dispatch(
+					loginSuccess({
+						user: userData.user || {
+							id: userData.id,
+							full_name: userData.full_name,
+							email: userData.email,
+							role: userData.role,
+							nationality: userData.nationality,
+							verified: userData.verified,
+						},
+						accessToken: userData.accessToken,
+						refreshToken: userData.refreshToken,
+					}),
+				);
+
+				// Navigate based on role
+				if (userData.role === "ADMIN") {
+					navigate("/admin/dashboard");
+				} else {
+					const returnUrl = location.state?.returnUrl || "/";
+					navigate(returnUrl);
+				}
+			} else {
+				dispatch(loginFailure(result.message));
+				setLocalError(result.message);
+			}
+		} catch (err) {
+			const errorMsg = err.message || "An unexpected error occurred";
+			dispatch(loginFailure(errorMsg));
+			setLocalError(errorMsg);
 		}
 	};
 
-	const handleSignupFunc = async (e) => {
+	/**
+	 * Handle User Registration
+	 */
+	const handleSignupSubmit = async (e) => {
 		e.preventDefault();
-		setErrorMsg("");
+		clearSignupErrors();
 
-		// Validation
+		// Client-side validation
 		if (
 			!signupName ||
 			!signupEmail ||
 			!signupPassword ||
 			!signupConfirmPassword
 		) {
-			setErrorMsg("All fields are required");
+			setSignupLocalError("All fields are required");
 			return;
 		}
 
 		if (signupPassword !== signupConfirmPassword) {
-			setErrorMsg("Passwords do not match");
+			setSignupLocalError("Passwords do not match");
 			return;
 		}
 
-		if (signupPassword.length < 6) {
-			setErrorMsg("Password must be at least 6 characters");
+		if (signupPassword.length < 8) {
+			setSignupLocalError("Password must be at least 8 characters long");
+			return;
+		}
+
+		if (!/[A-Z]/.test(signupPassword)) {
+			setSignupLocalError(
+				"Password must contain at least one uppercase letter",
+			);
+			return;
+		}
+
+		if (!/\d/.test(signupPassword)) {
+			setSignupLocalError("Password must contain at least one number");
 			return;
 		}
 
 		try {
-			// TODO: REPLACE WITH ACTUAL API CALL
-			// const res = await fetch('/api/v1/auth/register', {
-			//   method: 'POST',
-			//   headers: { 'Content-Type': 'application/json' },
-			//   body: JSON.stringify({
-			//     name: signupName,
-			//     email: signupEmail,
-			//     nationality: signupNationality,
-			//     password: signupPassword
-			//   })
-			// });
-			// const data = await res.json();
+			dispatch(registerStart());
 
-			// For now, mock the registration and navigate to OTP
-			navigate("/verify-otp", { state: { email: signupEmail } });
+			// Call authentication service
+			const result = await authService.register({
+				full_name: signupName,
+				email: signupEmail,
+				password: signupPassword,
+				nationality: signupNationality || null,
+			});
+
+			if (result.success) {
+				// Show success and navigate to OTP verification
+				dispatch(
+					registerSuccess({
+						message: result.message,
+					}),
+				);
+
+				// Navigate to OTP verification page with email
+				navigate("/verify-otp", { state: { email: signupEmail } });
+			} else {
+				dispatch(registerFailure(result.message));
+				setSignupLocalError(result.message);
+			}
 		} catch (err) {
-			setErrorMsg("Registration failed. Please try again.");
+			const errorMsg = err.message || "An unexpected error occurred";
+			dispatch(registerFailure(errorMsg));
+			setSignupLocalError(errorMsg);
 		}
 	};
+
+	// Redirect if already logged in
+	if (isLoggedIn) {
+		navigate("/");
+		return null;
+	}
 
 	return (
 		<div className="w-full min-h-screen flex items-center justify-center p-4 md:p-8">
@@ -203,14 +246,29 @@ export default function Login() {
 
 					{/* Sign In Tab */}
 					{activeTab === "signin" && (
-						<form onSubmit={handleLoginFunc}>
+						<form onSubmit={handleLoginSubmit}>
 							<h3 className="font-serif text-2xl font-bold text-on-surface mb-8">
 								Welcome Back
 							</h3>
 
-							{errorMsg && (
+							{/* Error Message */}
+							{(error || localError) && (
 								<div className="mb-6 p-4 bg-error-container text-on-error-container text-sm font-bold rounded-lg border-l-4 border-error">
-									{errorMsg}
+									{error || localError}
+									<button
+										type="button"
+										onClick={clearErrors}
+										className="float-right text-lg hover:opacity-70"
+									>
+										×
+									</button>
+								</div>
+							)}
+
+							{/* Success Message */}
+							{successMessage && (
+								<div className="mb-6 p-4 bg-success-container text-on-success-container text-sm font-bold rounded-lg border-l-4 border-success">
+									{successMessage}
 								</div>
 							)}
 
@@ -225,27 +283,31 @@ export default function Login() {
 									Email Address
 								</label>
 								<input
-									type="text"
+									type="email"
 									value={email}
-									onChange={(e) => setEmail(e.target.value)}
-									placeholder="user@gmail.com"
-									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors"
+									onChange={(e) => {
+										setEmail(e.target.value);
+										clearErrors();
+									}}
+									placeholder="user@example.com"
+									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors disabled:opacity-50"
 									required
+									disabled={loading}
 								/>
 							</div>
 
-							{/* Password Input with Toggle */}
+							{/* Password Input */}
 							<div className="mb-6">
 								<div className="flex justify-between items-center mb-2">
 									<label className="font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant">
 										Password
 									</label>
-									<button
-										type="button"
+									<Link
+										to="/forgot-password"
 										className="text-primary text-sm font-bold hover:underline"
 									>
 										Forgot?
-									</button>
+									</Link>
 								</div>
 								<div className="relative">
 									<input
@@ -253,20 +315,22 @@ export default function Login() {
 											showPassword ? "text" : "password"
 										}
 										value={password}
-										onChange={(e) =>
-											setPassword(e.target.value)
-										}
+										onChange={(e) => {
+											setPassword(e.target.value);
+											clearErrors();
+										}}
 										placeholder="••••••••"
-										className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors pr-12"
+										className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors pr-12 disabled:opacity-50"
 										required
+										disabled={loading}
 									/>
 									<button
 										type="button"
 										onClick={() =>
 											setShowPassword(!showPassword)
 										}
-										className="absolute right-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors"
-										aria-label="Toggle password visibility"
+										className="absolute right-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
+										disabled={loading}
 									>
 										<span className="material-symbols-outlined text-xl">
 											{showPassword
@@ -277,7 +341,7 @@ export default function Login() {
 								</div>
 							</div>
 
-							{/* Checkbox */}
+							{/* Keep Auth Checkbox */}
 							<label className="flex items-center gap-3 mb-8">
 								<input
 									type="checkbox"
@@ -285,7 +349,8 @@ export default function Login() {
 									onChange={(e) =>
 										setKeepAuth(e.target.checked)
 									}
-									className="w-4 h-4 accent-primary rounded"
+									className="w-4 h-4 accent-primary rounded disabled:opacity-50"
+									disabled={loading}
 								/>
 								<span className="text-sm text-on-surface-variant font-body">
 									Keep me authenticated for 30 days
@@ -295,60 +360,52 @@ export default function Login() {
 							{/* Submit Button */}
 							<button
 								type="submit"
-								className="w-full bg-primary text-white py-3 rounded-xl font-bold font-body flex items-center justify-center gap-2 hover:opacity-90 transition-all artifact-shadow mb-6"
+								disabled={loading}
+								className="w-full bg-primary text-white py-3 rounded-xl font-bold font-body flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-6"
 							>
-								Enter Portal
-								<span className="material-symbols-outlined">
-									arrow_forward
-								</span>
+								{loading ? (
+									<>
+										<span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+										Signing in...
+									</>
+								) : (
+									<>
+										Enter Portal
+										<span className="material-symbols-outlined">
+											arrow_forward
+										</span>
+									</>
+								)}
 							</button>
-
-							{/* Footer Link */}
-							<div className="text-center text-sm text-on-surface-variant mt-8 font-body">
-								Temp Login Hints:
-								<div className="flex justify-center gap-4 mt-2 font-mono text-xs">
-									<button
-										type="button"
-										onClick={() => {
-											setEmail("admin");
-											setPassword("admin");
-										}}
-										className="px-3 py-1 bg-surface-container rounded hover:bg-surface-container-high transition-colors"
-									>
-										Admin: admin/admin
-									</button>
-									<button
-										type="button"
-										onClick={() => {
-											setEmail("user");
-											setPassword("user");
-										}}
-										className="px-3 py-1 bg-surface-container rounded hover:bg-surface-container-high transition-colors"
-									>
-										User: user/user
-									</button>
-								</div>
-							</div>
 						</form>
 					)}
 
 					{/* Sign Up Tab */}
 					{activeTab === "signup" && (
-						<form onSubmit={handleSignupFunc}>
+						<form onSubmit={handleSignupSubmit}>
 							<h3 className="font-serif text-2xl font-bold text-on-surface mb-8">
 								Create Account
 							</h3>
+
+							{/* Error Message */}
+							{(error || signupLocalError) && (
+								<div className="mb-6 p-4 bg-error-container text-on-error-container text-sm font-bold rounded-lg border-l-4 border-error">
+									{error || signupLocalError}
+									<button
+										type="button"
+										onClick={clearSignupErrors}
+										className="float-right text-lg hover:opacity-70"
+									>
+										×
+									</button>
+								</div>
+							)}
+
 							<p className="text-on-surface-variant text-sm mb-6">
 								Join our community of heritage enthusiasts.
 							</p>
 
-							{errorMsg && (
-								<div className="mb-6 p-4 bg-error-container text-on-error-container text-sm font-bold rounded-lg border-l-4 border-error">
-									{errorMsg}
-								</div>
-							)}
-
-							{/* Name Input */}
+							{/* Full Name Input */}
 							<div className="mb-5">
 								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">
 									Full Name
@@ -356,11 +413,13 @@ export default function Login() {
 								<input
 									type="text"
 									value={signupName}
-									onChange={(e) =>
-										setSignupName(e.target.value)
-									}
+									onChange={(e) => {
+										setSignupName(e.target.value);
+										clearSignupErrors();
+									}}
 									placeholder="Your full name"
-									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors"
+									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors disabled:opacity-50"
+									disabled={loading}
 								/>
 							</div>
 
@@ -372,11 +431,13 @@ export default function Login() {
 								<input
 									type="email"
 									value={signupEmail}
-									onChange={(e) =>
-										setSignupEmail(e.target.value)
-									}
+									onChange={(e) => {
+										setSignupEmail(e.target.value);
+										clearSignupErrors();
+									}}
 									placeholder="example@example.com"
-									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors"
+									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors disabled:opacity-50"
+									disabled={loading}
 								/>
 							</div>
 
@@ -388,15 +449,17 @@ export default function Login() {
 								<input
 									type="text"
 									value={signupNationality}
-									onChange={(e) =>
-										setSignupNationality(e.target.value)
-									}
+									onChange={(e) => {
+										setSignupNationality(e.target.value);
+										clearSignupErrors();
+									}}
 									placeholder="e.g., Nepalese"
-									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors"
+									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors disabled:opacity-50"
+									disabled={loading}
 								/>
 							</div>
 
-							{/* Password Input with Toggle */}
+							{/* Password Input */}
 							<div className="mb-5">
 								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">
 									Password
@@ -407,18 +470,21 @@ export default function Login() {
 											showPassword ? "text" : "password"
 										}
 										value={signupPassword}
-										onChange={(e) =>
-											setSignupPassword(e.target.value)
-										}
-										placeholder="Create a password"
-										className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors pr-12"
+										onChange={(e) => {
+											setSignupPassword(e.target.value);
+											clearSignupErrors();
+										}}
+										placeholder="Create a strong password"
+										className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors pr-12 disabled:opacity-50"
+										disabled={loading}
 									/>
 									<button
+										type="button"
 										onClick={() =>
 											setShowPassword(!showPassword)
 										}
-										className="absolute right-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors"
-										aria-label="Toggle password visibility"
+										className="absolute right-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
+										disabled={loading}
 									>
 										<span className="material-symbols-outlined text-xl">
 											{showPassword
@@ -427,9 +493,12 @@ export default function Login() {
 										</span>
 									</button>
 								</div>
+								<p className="text-xs text-on-surface-variant mt-2">
+									Min 8 chars, 1 uppercase, 1 number
+								</p>
 							</div>
 
-							{/* Confirm Password Input with Toggle */}
+							{/* Confirm Password Input */}
 							<div className="mb-6">
 								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">
 									Confirm Password
@@ -442,22 +511,25 @@ export default function Login() {
 												: "password"
 										}
 										value={signupConfirmPassword}
-										onChange={(e) =>
+										onChange={(e) => {
 											setSignupConfirmPassword(
 												e.target.value,
-											)
-										}
+											);
+											clearSignupErrors();
+										}}
 										placeholder="Confirm your password"
-										className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors pr-12"
+										className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors pr-12 disabled:opacity-50"
+										disabled={loading}
 									/>
 									<button
+										type="button"
 										onClick={() =>
 											setShowConfirmPassword(
 												!showConfirmPassword,
 											)
 										}
-										className="absolute right-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors"
-										aria-label="Toggle confirm password visibility"
+										className="absolute right-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
+										disabled={loading}
 									>
 										<span className="material-symbols-outlined text-xl">
 											{showConfirmPassword
@@ -471,12 +543,22 @@ export default function Login() {
 							{/* Create Account Button */}
 							<button
 								type="submit"
-								className="w-full bg-primary text-white py-3 rounded-xl font-bold font-body flex items-center justify-center gap-2 hover:opacity-90 transition-all artifact-shadow mb-6"
+								disabled={loading}
+								className="w-full bg-primary text-white py-3 rounded-xl font-bold font-body flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-6"
 							>
-								Create Account
-								<span className="material-symbols-outlined">
-									person_add
-								</span>
+								{loading ? (
+									<>
+										<span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+										Creating Account...
+									</>
+								) : (
+									<>
+										Create Account
+										<span className="material-symbols-outlined">
+											person_add
+										</span>
+									</>
+								)}
 							</button>
 
 							{/* Sign In Link */}
@@ -484,7 +566,10 @@ export default function Login() {
 								Already have an account?{" "}
 								<button
 									type="button"
-									onClick={() => setActiveTab("signin")}
+									onClick={() => {
+										setActiveTab("signin");
+										clearSignupErrors();
+									}}
 									className="text-primary font-bold hover:underline"
 								>
 									Sign In
