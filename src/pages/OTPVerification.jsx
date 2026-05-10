@@ -66,11 +66,14 @@ export default function OTPVerification() {
 		try {
 			// API call to verify OTP
 			// POST /api/v1/auth/verify-otp
-			const response = await fetch("/api/v1/auth/verify-otp", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ email, otp: otpCode }),
-			});
+			const response = await fetch(
+				"http://localhost:8000/api/v1/auth/verify-otp",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ email, otp: otpCode }),
+				},
+			);
 
 			const data = await response.json();
 
@@ -100,11 +103,14 @@ export default function OTPVerification() {
 		try {
 			// API call to resend OTP
 			// POST /api/v1/auth/resend-otp
-			const response = await fetch("/api/v1/auth/resend-otp", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ email }),
-			});
+			const response = await fetch(
+				"http://localhost:8000/api/v1/auth/resend-otp",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ email }),
+				},
+			);
 
 			const data = await response.json();
 

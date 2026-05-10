@@ -125,23 +125,35 @@ export default function Login() {
 		}
 
 		try {
-			// TODO: REPLACE WITH ACTUAL API CALL
-			// const res = await fetch('/api/v1/auth/register', {
-			//   method: 'POST',
-			//   headers: { 'Content-Type': 'application/json' },
-			//   body: JSON.stringify({
-			//     name: signupName,
-			//     email: signupEmail,
-			//     nationality: signupNationality,
-			//     password: signupPassword
-			//   })
-			// });
-			// const data = await res.json();
+			const res = await fetch(
+				"http://localhost:8000/api/v1/auth/register",
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						full_name: signupName,
+						email: signupEmail,
+						password: signupPassword,
+						confirm_password: signupConfirmPassword,
+					}),
+				},
+			);
 
-			// For now, mock the registration and navigate to OTP
+			const data = await res.json();
+
+			if (!res.ok) {
+				setErrorMsg(
+					data.message || "Registration failed. Please try again.",
+				);
+				return;
+			}
+
+			// On success, navigate to OTP verification
 			navigate("/verify-otp", { state: { email: signupEmail } });
 		} catch (err) {
-			setErrorMsg("Registration failed. Please try again.");
+			setErrorMsg("Network error. Please ensure the backend is running.");
 		}
 	};
 
