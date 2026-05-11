@@ -16,7 +16,7 @@ export default function TopNavigation() {
 	const isLoginPage = location.pathname === "/login";
 
 	const languages = [
-		{ code: "en", label: "English", icon: "🇬🇧" },
+		{ code: "en", label: "English", icon: "🇺🇸" },
 		{ code: "hi", label: "Hindi", icon: "🇮🇳" },
 		{ code: "ne", label: "Nepali", icon: "🇳🇵" },
 	];
@@ -64,12 +64,16 @@ export default function TopNavigation() {
 				<div className="relative">
 					<button
 						onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-						className="p-2 hover:bg-surface-container-low rounded-full transition-colors flex items-center gap-2"
+						className="p-1 hover:bg-surface-container-low rounded-xl transition-colors flex items-center gap-2"
 					>
-						<span className="material-symbols-outlined text-primary">
-							language
+						<span className="text-2xl">
+							{
+								languages.find(
+									(l) => l.code === selectedLanguage,
+								)?.icon
+							}
 						</span>
-						<span className="text-sm font-medium text-on-surface hidden md:inline">
+						<span className="text-xs font-black text-on-surface uppercase tracking-widest hidden md:inline">
 							{
 								languages.find(
 									(l) => l.code === selectedLanguage,
@@ -130,7 +134,7 @@ export default function TopNavigation() {
 									</p>
 								</div>
 								<Link
-									to="/admin/dashboard"
+									to={user?.role === "ADMIN" ? "/admin/dashboard" : "/dashboard"}
 									onClick={() => setShowProfileMenu(false)}
 									className="w-full px-3 py-2 rounded-lg text-left text-on-surface hover:bg-surface-container transition-colors block"
 								>

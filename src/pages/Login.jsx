@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";          // ← Added useRef
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -12,11 +12,6 @@ import {
 } from "../store/authSlice";
 import authService from "../services/auth.service";
 
-/**
- * Login & Registration Page
- * Handles user authentication flow with register and login
- * Professional implementation with proper error handling and loading states
- */
 export default function Login() {
 	const [activeTab, setActiveTab] = useState("signin");
 	const [showPassword, setShowPassword] = useState(false);
@@ -25,10 +20,13 @@ export default function Login() {
 	const location = useLocation();
 	const dispatch = useDispatch();
 
-	// Redux state selectors
+	// ── Redux state ──
 	const { loading, error, successMessage, isLoggedIn } = useSelector(
 		(state) => state.auth,
 	);
+
+	// ── Double‑submit guard ref ──
+	const isSubmitting = useRef(false);
 
 	// Sign In Form State
 	const [email, setEmail] = useState("");
@@ -44,7 +42,6 @@ export default function Login() {
 	const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
 	const [signupLocalError, setSignupLocalError] = useState("");
 
-	// Clear error when user interacts with form
 	const clearErrors = () => {
 		setLocalError("");
 		dispatch(clearError());
@@ -55,27 +52,24 @@ export default function Login() {
 		dispatch(clearError());
 	};
 
-	/**
-	 * Handle User Login
-	 */
+	// ── LOGIN HANDLER ──
 	const handleLoginSubmit = async (e) => {
 		e.preventDefault();
+		if (isSubmitting.current) return;
+		isSubmitting.current = true;
 		clearErrors();
 
-		// Client-side validation
 		if (!email || !password) {
 			setLocalError("Please enter your email and password");
+			isSubmitting.current = false;
 			return;
 		}
 
 		try {
 			dispatch(loginStart());
-
-			// Call authentication service
 			const result = await authService.login(email, password);
 
 			if (result.success) {
-				// Dispatch success action
 				const userData = result.data;
 				dispatch(
 					loginSuccess({
@@ -92,13 +86,8 @@ export default function Login() {
 					}),
 				);
 
-				// Navigate based on role
-				if (userData.role === "ADMIN") {
-					navigate("/admin/dashboard");
-				} else {
-					const returnUrl = location.state?.returnUrl || "/";
-					navigate(returnUrl);
-				}
+				const returnUrl = location.state?.returnUrl || "/";
+				navigate(returnUrl);
 			} else {
 				dispatch(loginFailure(result.message));
 				setLocalError(result.message);
@@ -107,84 +96,47 @@ export default function Login() {
 			const errorMsg = err.message || "An unexpected error occurred";
 			dispatch(loginFailure(errorMsg));
 			setLocalError(errorMsg);
+		} finally {
+			isSubmitting.current = false;
 		}
 	};
 
-	/**
-	 * Handle User Registration
-	 */
+	// ── REGISTER HANDLER ──
 	const handleSignupSubmit = async (e) => {
 		e.preventDefault();
+		if (isSubmitting.current) return;
+		isSubmitting.current = true;
 		clearSignupErrors();
 
-		// Client-side validation
-		if (
-			!signupName ||
-			!signupEmail ||
-			!signupPassword ||
-			!signupConfirmPassword
-		) {
+		// Client‑side validation
+		if (!signupName || !signupEmail || !signupPassword || !signupConfirmPassword) {
 			setSignupLocalError("All fields are required");
+			isSubmitting.current = false;
 			return;
 		}
-
 		if (signupPassword !== signupConfirmPassword) {
 			setSignupLocalError("Passwords do not match");
+			isSubmitting.current = false;
 			return;
 		}
-
 		if (signupPassword.length < 8) {
 			setSignupLocalError("Password must be at least 8 characters long");
+			isSubmitting.current = false;
 			return;
 		}
-
 		if (!/[A-Z]/.test(signupPassword)) {
-			setSignupLocalError(
-				"Password must contain at least one uppercase letter",
-			);
+			setSignupLocalError("Password must contain at least one uppercase letter");
+			isSubmitting.current = false;
 			return;
 		}
-
 		if (!/\d/.test(signupPassword)) {
 			setSignupLocalError("Password must contain at least one number");
+			isSubmitting.current = false;
 			return;
 		}
 
 		try {
-<<<<<<< HEAD
-			const res = await fetch(
-				"http://localhost:8000/api/v1/auth/register",
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({
-						full_name: signupName,
-						email: signupEmail,
-						password: signupPassword,
-						confirm_password: signupConfirmPassword,
-					}),
-				},
-			);
-
-			const data = await res.json();
-
-			if (!res.ok) {
-				setErrorMsg(
-					data.message || "Registration failed. Please try again.",
-				);
-				return;
-			}
-
-			// On success, navigate to OTP verification
-			navigate("/verify-otp", { state: { email: signupEmail } });
-		} catch (err) {
-			setErrorMsg("Network error. Please ensure the backend is running.");
-=======
 			dispatch(registerStart());
-
-			// Call authentication service
 			const result = await authService.register({
 				full_name: signupName,
 				email: signupEmail,
@@ -193,14 +145,7 @@ export default function Login() {
 			});
 
 			if (result.success) {
-				// Show success and navigate to OTP verification
-				dispatch(
-					registerSuccess({
-						message: result.message,
-					}),
-				);
-
-				// Navigate to OTP verification page with email
+				dispatch(registerSuccess({ message: result.message }));
 				navigate("/verify-otp", { state: { email: signupEmail } });
 			} else {
 				dispatch(registerFailure(result.message));
@@ -210,16 +155,18 @@ export default function Login() {
 			const errorMsg = err.message || "An unexpected error occurred";
 			dispatch(registerFailure(errorMsg));
 			setSignupLocalError(errorMsg);
->>>>>>> 29a25bdc3515ad448efc3d3a337c80b11717c230
+		} finally {
+			isSubmitting.current = false;
 		}
 	};
 
-	// Redirect if already logged in
+	// ── Redirect if already logged in ──
 	if (isLoggedIn) {
 		navigate("/");
 		return null;
 	}
 
+	// ── JSX (unchanged) ──
 	return (
 		<div className="w-full min-h-screen flex items-center justify-center p-4 md:p-8">
 			{/* Background Elements */}
@@ -232,12 +179,8 @@ export default function Login() {
 				{/* Card Header */}
 				<div className="bg-primary rounded-2xl p-8 md:p-10 text-white mb-6">
 					<div className="flex items-center gap-2 mb-6">
-						<span className="material-symbols-outlined text-3xl">
-							account_balance
-						</span>
-						<h1 className="font-serif text-2xl font-bold">
-							Heritage Gatha
-						</h1>
+						<span className="material-symbols-outlined text-3xl">account_balance</span>
+						<h1 className="font-serif text-2xl font-bold">Heritage Gatha</h1>
 					</div>
 					<h2 className="font-serif text-3xl font-bold leading-tight mb-4">
 						The stories of stone,
@@ -245,8 +188,7 @@ export default function Login() {
 						reimagined.
 					</h2>
 					<p className="text-white/90 text-sm font-body">
-						Access the archival portal to curate monuments or share
-						your echoes of history.
+						Access the archival portal to curate monuments or share your echoes of history.
 					</p>
 				</div>
 
@@ -279,11 +221,8 @@ export default function Login() {
 					{/* Sign In Tab */}
 					{activeTab === "signin" && (
 						<form onSubmit={handleLoginSubmit}>
-							<h3 className="font-serif text-2xl font-bold text-on-surface mb-8">
-								Welcome Back
-							</h3>
+							<h3 className="font-serif text-2xl font-bold text-on-surface mb-8">Welcome Back</h3>
 
-							{/* Error Message */}
 							{(error || localError) && (
 								<div className="mb-6 p-4 bg-error-container text-on-error-container text-sm font-bold rounded-lg border-l-4 border-error">
 									{error || localError}
@@ -297,7 +236,6 @@ export default function Login() {
 								</div>
 							)}
 
-							{/* Success Message */}
 							{successMessage && (
 								<div className="mb-6 p-4 bg-success-container text-on-success-container text-sm font-bold rounded-lg border-l-4 border-success">
 									{successMessage}
@@ -305,8 +243,7 @@ export default function Login() {
 							)}
 
 							<p className="text-on-surface-variant text-sm mb-6">
-								Enter your credentials to access the archival
-								gateway.
+								Enter your credentials to access the archival gateway.
 							</p>
 
 							{/* Email Input */}
@@ -317,10 +254,7 @@ export default function Login() {
 								<input
 									type="email"
 									value={email}
-									onChange={(e) => {
-										setEmail(e.target.value);
-										clearErrors();
-									}}
+									onChange={(e) => { setEmail(e.target.value); clearErrors(); }}
 									placeholder="user@example.com"
 									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors disabled:opacity-50"
 									required
@@ -331,26 +265,16 @@ export default function Login() {
 							{/* Password Input */}
 							<div className="mb-6">
 								<div className="flex justify-between items-center mb-2">
-									<label className="font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant">
-										Password
-									</label>
-									<Link
-										to="/forgot-password"
-										className="text-primary text-sm font-bold hover:underline"
-									>
+									<label className="font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant">Password</label>
+									<Link to="/forgot-password" className="text-primary text-sm font-bold hover:underline">
 										Forgot?
 									</Link>
 								</div>
 								<div className="relative">
 									<input
-										type={
-											showPassword ? "text" : "password"
-										}
+										type={showPassword ? "text" : "password"}
 										value={password}
-										onChange={(e) => {
-											setPassword(e.target.value);
-											clearErrors();
-										}}
+										onChange={(e) => { setPassword(e.target.value); clearErrors(); }}
 										placeholder="••••••••"
 										className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors pr-12 disabled:opacity-50"
 										required
@@ -358,16 +282,12 @@ export default function Login() {
 									/>
 									<button
 										type="button"
-										onClick={() =>
-											setShowPassword(!showPassword)
-										}
+										onClick={() => setShowPassword(!showPassword)}
 										className="absolute right-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
 										disabled={loading}
 									>
 										<span className="material-symbols-outlined text-xl">
-											{showPassword
-												? "visibility"
-												: "visibility_off"}
+											{showPassword ? "visibility" : "visibility_off"}
 										</span>
 									</button>
 								</div>
@@ -378,9 +298,7 @@ export default function Login() {
 								<input
 									type="checkbox"
 									checked={keepAuth}
-									onChange={(e) =>
-										setKeepAuth(e.target.checked)
-									}
+									onChange={(e) => setKeepAuth(e.target.checked)}
 									className="w-4 h-4 accent-primary rounded disabled:opacity-50"
 									disabled={loading}
 								/>
@@ -389,7 +307,6 @@ export default function Login() {
 								</span>
 							</label>
 
-							{/* Submit Button */}
 							<button
 								type="submit"
 								disabled={loading}
@@ -403,9 +320,7 @@ export default function Login() {
 								) : (
 									<>
 										Enter Portal
-										<span className="material-symbols-outlined">
-											arrow_forward
-										</span>
+										<span className="material-symbols-outlined">arrow_forward</span>
 									</>
 								)}
 							</button>
@@ -415,11 +330,8 @@ export default function Login() {
 					{/* Sign Up Tab */}
 					{activeTab === "signup" && (
 						<form onSubmit={handleSignupSubmit}>
-							<h3 className="font-serif text-2xl font-bold text-on-surface mb-8">
-								Create Account
-							</h3>
+							<h3 className="font-serif text-2xl font-bold text-on-surface mb-8">Create Account</h3>
 
-							{/* Error Message */}
 							{(error || signupLocalError) && (
 								<div className="mb-6 p-4 bg-error-container text-on-error-container text-sm font-bold rounded-lg border-l-4 border-error">
 									{error || signupLocalError}
@@ -433,95 +345,67 @@ export default function Login() {
 								</div>
 							)}
 
-							<p className="text-on-surface-variant text-sm mb-6">
-								Join our community of heritage enthusiasts.
-							</p>
+							<p className="text-on-surface-variant text-sm mb-6">Join our community of heritage enthusiasts.</p>
 
-							{/* Full Name Input */}
+							{/* Full Name */}
 							<div className="mb-5">
-								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">
-									Full Name
-								</label>
+								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Full Name</label>
 								<input
 									type="text"
 									value={signupName}
-									onChange={(e) => {
-										setSignupName(e.target.value);
-										clearSignupErrors();
-									}}
+									onChange={(e) => { setSignupName(e.target.value); clearSignupErrors(); }}
 									placeholder="Your full name"
 									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors disabled:opacity-50"
 									disabled={loading}
 								/>
 							</div>
 
-							{/* Email Input */}
+							{/* Email */}
 							<div className="mb-5">
-								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">
-									Email Address
-								</label>
+								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Email Address</label>
 								<input
 									type="email"
 									value={signupEmail}
-									onChange={(e) => {
-										setSignupEmail(e.target.value);
-										clearSignupErrors();
-									}}
+									onChange={(e) => { setSignupEmail(e.target.value); clearSignupErrors(); }}
 									placeholder="example@example.com"
 									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors disabled:opacity-50"
 									disabled={loading}
 								/>
 							</div>
 
-							{/* Nationality Input */}
+							{/* Nationality */}
 							<div className="mb-5">
-								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">
-									Nationality
-								</label>
+								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Nationality</label>
 								<input
 									type="text"
 									value={signupNationality}
-									onChange={(e) => {
-										setSignupNationality(e.target.value);
-										clearSignupErrors();
-									}}
+									onChange={(e) => { setSignupNationality(e.target.value); clearSignupErrors(); }}
 									placeholder="e.g., Nepalese"
 									className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors disabled:opacity-50"
 									disabled={loading}
 								/>
 							</div>
 
-							{/* Password Input */}
+							{/* Password */}
 							<div className="mb-5">
-								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">
-									Password
-								</label>
+								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Password</label>
 								<div className="relative">
 									<input
-										type={
-											showPassword ? "text" : "password"
-										}
+										type={showPassword ? "text" : "password"}
 										value={signupPassword}
-										onChange={(e) => {
-											setSignupPassword(e.target.value);
-											clearSignupErrors();
-										}}
+										onChange={(e) => { setSignupPassword(e.target.value); clearSignupErrors(); }}
 										placeholder="Create a strong password"
 										className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors pr-12 disabled:opacity-50"
 										disabled={loading}
 									/>
 									<button
 										type="button"
-										onClick={() =>
-											setShowPassword(!showPassword)
-										}
+										onClick={() => setShowPassword(!showPassword)}
 										className="absolute right-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
 										disabled={loading}
 									>
 										<span className="material-symbols-outlined text-xl">
-											{showPassword
-												? "visibility"
-												: "visibility_off"}
+											{showPassword ? "visibility" : "visibility_off"}
 										</span>
 									</button>
 								</div>
@@ -530,49 +414,31 @@ export default function Login() {
 								</p>
 							</div>
 
-							{/* Confirm Password Input */}
+							{/* Confirm Password */}
 							<div className="mb-6">
-								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">
-									Confirm Password
-								</label>
+								<label className="block font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Confirm Password</label>
 								<div className="relative">
 									<input
-										type={
-											showConfirmPassword
-												? "text"
-												: "password"
-										}
+										type={showConfirmPassword ? "text" : "password"}
 										value={signupConfirmPassword}
-										onChange={(e) => {
-											setSignupConfirmPassword(
-												e.target.value,
-											);
-											clearSignupErrors();
-										}}
+										onChange={(e) => { setSignupConfirmPassword(e.target.value); clearSignupErrors(); }}
 										placeholder="Confirm your password"
 										className="w-full px-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors pr-12 disabled:opacity-50"
 										disabled={loading}
 									/>
 									<button
 										type="button"
-										onClick={() =>
-											setShowConfirmPassword(
-												!showConfirmPassword,
-											)
-										}
+										onClick={() => setShowConfirmPassword(!showConfirmPassword)}
 										className="absolute right-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
 										disabled={loading}
 									>
 										<span className="material-symbols-outlined text-xl">
-											{showConfirmPassword
-												? "visibility"
-												: "visibility_off"}
+											{showConfirmPassword ? "visibility" : "visibility_off"}
 										</span>
 									</button>
 								</div>
 							</div>
 
-							{/* Create Account Button */}
 							<button
 								type="submit"
 								disabled={loading}
@@ -586,22 +452,16 @@ export default function Login() {
 								) : (
 									<>
 										Create Account
-										<span className="material-symbols-outlined">
-											person_add
-										</span>
+										<span className="material-symbols-outlined">person_add</span>
 									</>
 								)}
 							</button>
 
-							{/* Sign In Link */}
 							<p className="text-center text-sm text-on-surface-variant mt-6 font-body">
 								Already have an account?{" "}
 								<button
 									type="button"
-									onClick={() => {
-										setActiveTab("signin");
-										clearSignupErrors();
-									}}
+									onClick={() => { setActiveTab("signin"); clearSignupErrors(); }}
 									className="text-primary font-bold hover:underline"
 								>
 									Sign In

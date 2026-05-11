@@ -84,21 +84,7 @@ export default function OTPVerification() {
 		clearErrors();
 
 		try {
-<<<<<<< HEAD
-			// API call to verify OTP
-			// POST /api/v1/auth/verify-otp
-			const response = await fetch(
-				"http://localhost:8000/api/v1/auth/verify-otp",
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ email, otp: otpCode }),
-				},
-			);
-=======
-			dispatch(verifyOTPStart());
->>>>>>> 29a25bdc3515ad448efc3d3a337c80b11717c230
-
+		dispatch(verifyOTPStart());
 			// Call authentication service
 			const result = await authService.verifyOTP(email, otpCode);
 
@@ -107,13 +93,6 @@ export default function OTPVerification() {
 				const userData = result.data;
 				dispatch(
 					verifyOTPSuccess({
-						message: result.message,
-					}),
-				);
-
-				// Dispatch login success to update auth state
-				dispatch(
-					loginSuccess({
 						user: userData.user || {
 							id: userData.id,
 							full_name: userData.full_name,
@@ -124,8 +103,10 @@ export default function OTPVerification() {
 						},
 						accessToken: userData.accessToken,
 						refreshToken: userData.refreshToken,
+						message: result.message,
 					}),
 				);
+
 
 				// Navigate to home after short delay
 				setTimeout(() => {
@@ -148,22 +129,8 @@ export default function OTPVerification() {
 		setIsResending(true);
 
 		try {
-<<<<<<< HEAD
-			// API call to resend OTP
-			// POST /api/v1/auth/resend-otp
-			const response = await fetch(
-				"http://localhost:8000/api/v1/auth/resend-otp",
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ email }),
-				},
-			);
-=======
-			// Call authentication service
-			const result = await authService.resendOTP(email);
->>>>>>> 29a25bdc3515ad448efc3d3a337c80b11717c230
-
+		// Call authentication service
+		const result = await authService.resendOTP(email);
 			if (result.success) {
 				// Reset OTP inputs and restart timer
 				setOtp(["", "", "", "", "", ""]);

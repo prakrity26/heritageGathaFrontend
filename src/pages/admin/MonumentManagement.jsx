@@ -1,62 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-
-// ============================================================================
-// EXPECTED API CONTRACTS (FOR BACKEND TEAM)
-// ============================================================================
-// API: GET /api/v1/admin/monuments?page=1&limit=25&filter=all
-// Description: Fetches paginated list of all monuments with stats.
-// Response: { count: 125, data: [{ id: "m1", name: "Taj Mahal", status: "live", ... }] }
-//
-// API: DELETE /api/v1/admin/monuments/:id
-// Description: Hard deletes or achieves a monument record.
+import adminService from "../../services/admin.service";
 
 export default function MonumentManagement() {
 	const [filter, setFilter] = useState("all");
+	const [searchQuery, setSearchQuery] = useState("");
+	const [monuments, setMonuments] = useState([]);
+	const [loading, setLoading] = useState(true);
+	const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1 });
 	const navigate = useNavigate();
 
-	const monuments = [
-		{
-			id: 1,
-			name: "Taj Mahal",
-			location: "Agra, UP",
-			scans: "1.2M+",
-			lastUpdate: "Oct 24, 2023",
-			status: "live",
-		},
-		{
-			id: 2,
-			name: "Rani Ki Vav",
-			location: "Patan, GJ",
-			scans: "450K",
-			lastUpdate: "Nov 12, 2023",
-			status: "needs-audio",
-		},
-		{
-			id: 3,
-			name: "Golden Temple",
-			location: "Amritsar, PB",
-			scans: "2.1M",
-			lastUpdate: "Dec 01, 2023",
-			status: "live",
-		},
-		{
-			id: 4,
-			name: "Konark Sun Temple",
-			location: "Konark, OR",
-			scans: "120K",
-			lastUpdate: "Jan 14, 2024",
-			status: "draft",
-		},
-		{
-			id: 5,
-			name: "Hampi Ruins",
-			location: "Hampi, KA",
-			scans: "890K",
-			lastUpdate: "Feb 05, 2024",
-			status: "live",
-		},
-	];
+	const fetchMonuments = async (page = 1, status = filter, search = searchQuery) => {
+		setLoading(true);
+		try {
+			const res = await adminService.getMonuments(page, 10, status, search);
+			if (res.success) {
+				setMonuments(res.data || []);
+				setPagination(res.pagination || { page: 1, limit: 10, totalPages: 1 });
+			}
+		} catch (error) {
+			console.error("Failed to fetch monuments:", error);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		// Fetch with current filter/search/page
+		const debounceTimeout = setTimeout(() => {
+			fetchMonuments(pagination.page, filter, searchQuery);
+		}, 300); // 300ms debounce for search
+		return () => clearTimeout(debounceTimeout);
+	}, [filter, searchQuery, pagination.page]);
+
+	const handleDelete = async (e, id) => {
+		e.stopPropagation();
+		if (window.confirm("Are you sure you want to delete this monument? This action cannot be undone.")) {
+			const res = await adminService.deleteMonument(id);
+			if (res.success) {
+				fetchMonuments(pagination.page, filter, searchQuery);
+			} else {
+				alert(res.message || "Failed to delete monument");
+			}
+		}
+	};
 
 	return (
 		<main className="p-8 lg:p-12">
@@ -98,7 +85,12 @@ export default function MonumentManagement() {
 						</span>
 						<input
 							type="text"
-							placeholder="Search by name, location, or tag..."
+							placeholder="Search by name or description..."
+							value={searchQuery}
+							onChange={(e) => {
+								setSearchQuery(e.target.value);
+								setPagination((p) => ({ ...p, page: 1 })); // Reset to first page
+							}}
 							className="w-full pl-12 pr-4 py-3 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant/50 focus:border-primary focus:outline-none transition-colors"
 						/>
 					</div>
@@ -110,10 +102,13 @@ export default function MonumentManagement() {
 
 				{/* Filter Tags */}
 				<div className="flex flex-wrap gap-2">
-					{["All Sites", "Agra", "Patan", "Hampi"].map((tag) => (
+					{["All", "Live", "Draft", "Archived"].map((tag) => (
 						<button
 							key={tag}
-							onClick={() => setFilter(tag.toLowerCase())}
+							onClick={() => {
+								setFilter(tag.toLowerCase());
+								setPagination((p) => ({ ...p, page: 1 }));
+							}}
 							className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
 								filter === tag.toLowerCase()
 									? "bg-primary text-white"
@@ -152,107 +147,141 @@ export default function MonumentManagement() {
 						</tr>
 					</thead>
 					<tbody>
-						{monuments.map((monument) => (
-							<tr
-								key={monument.id}
-								onClick={() =>
-									navigate(
-										`/admin/monument/${monument.id}/edit`,
-										{ state: { monument } },
-									)
-								}
-								className="border-b border-surface-container hover:bg-surface-container-low transition-colors cursor-pointer group"
-							>
-								<td className="py-4 px-4">
-									<div className="flex items-center gap-3">
-										<div className="w-10 h-10 bg-surface-container rounded-lg flex items-center justify-center">
-											<span className="material-symbols-outlined text-sm text-primary">
-												account_balance
-											</span>
-										</div>
-										<div>
-											<p className="font-bold text-on-surface text-sm">
-												{monument.name}
-											</p>
-											<p className="text-xs text-on-surface-variant">
-												UNESCO World Site
-											</p>
-										</div>
-									</div>
-								</td>
-								<td className="py-4 px-4">
-									<div className="flex items-center gap-1">
-										<span className="material-symbols-outlined text-sm text-on-surface-variant">
-											location_on
-										</span>
-										<span className="text-sm text-on-surface-variant">
-											{monument.location}
-										</span>
-									</div>
-								</td>
-								<td className="py-4 px-4 text-sm font-bold text-on-surface">
-									{monument.scans}
-								</td>
-								<td className="py-4 px-4 text-sm text-on-surface-variant">
-									{monument.lastUpdate}
-								</td>
-								<td className="py-4 px-4">
-									<span
-										className={`px-3 py-1 rounded-full text-xs font-bold ${
-											monument.status === "live"
-												? "bg-green-100 text-green-700"
-												: monument.status ===
-													  "needs-audio"
-													? "bg-yellow-100 text-yellow-700"
-													: "bg-gray-100 text-gray-700"
-										}`}
-									>
-										{monument.status === "live"
-											? "● LIVE"
-											: monument.status === "needs-audio"
-												? "⚠ NEEDS AUDIO"
-												: "◯ DRAFT"}
-									</span>
-								</td>
-								<td className="py-4 px-4">
-									<Link
-										to={`/admin/monument/${monument.id}/edit`}
-										state={{ monument }}
-										className="inline-block p-2 hover:bg-surface-container rounded-lg transition-all"
-										onClick={(e) => e.stopPropagation()}
-									>
-										<span className="material-symbols-outlined text-on-surface-variant">
-											edit
-										</span>
-									</Link>
+						{loading ? (
+							<tr>
+								<td colSpan="6" className="py-8 text-center text-on-surface-variant">
+									Loading monuments...
 								</td>
 							</tr>
-						))}
+						) : monuments.length === 0 ? (
+							<tr>
+								<td colSpan="6" className="py-8 text-center text-on-surface-variant">
+									No monuments found.
+								</td>
+							</tr>
+						) : (
+							monuments.map((monument) => (
+								<tr
+									key={monument.id}
+									onClick={() =>
+										navigate(
+											`/admin/monument/${monument.id}/edit`,
+											{ state: { monument } },
+										)
+									}
+									className="border-b border-surface-container hover:bg-surface-container-low transition-colors cursor-pointer group"
+								>
+									<td className="py-4 px-4">
+										<div className="flex items-center gap-3">
+											<div className="w-10 h-10 bg-surface-container rounded-lg flex items-center justify-center">
+												<span className="material-symbols-outlined text-sm text-primary">
+													account_balance
+												</span>
+											</div>
+											<div>
+												<p className="font-bold text-on-surface text-sm">
+													{monument.name}
+												</p>
+												<p className="text-xs text-on-surface-variant">
+													{monument.era || "Unknown Era"}
+												</p>
+											</div>
+										</div>
+									</td>
+									<td className="py-4 px-4">
+										<div className="flex items-center gap-1">
+											<span className="material-symbols-outlined text-sm text-on-surface-variant">
+												location_on
+											</span>
+											<span className="text-sm text-on-surface-variant">
+												{monument.latitude}, {monument.longitude}
+											</span>
+										</div>
+									</td>
+									<td className="py-4 px-4 text-sm font-bold text-on-surface">
+										{monument.total_scans}
+									</td>
+									<td className="py-4 px-4 text-sm text-on-surface-variant">
+										{new Date(monument.updated_at).toLocaleDateString()}
+									</td>
+									<td className="py-4 px-4">
+										<span
+											className={`px-3 py-1 rounded-full text-xs font-bold ${
+												monument.status === "LIVE"
+													? "bg-green-100 text-green-700"
+													: monument.status === "DRAFT"
+														? "bg-yellow-100 text-yellow-700"
+														: "bg-gray-100 text-gray-700"
+											}`}
+										>
+											{monument.status === "LIVE"
+												? "● LIVE"
+												: monument.status === "DRAFT"
+													? "⚠ DRAFT"
+													: "◯ ARCHIVED"}
+										</span>
+									</td>
+									<td className="py-4 px-4">
+										<div className="flex gap-2">
+											<Link
+												to={`/admin/monument/${monument.id}/edit`}
+												state={{ monument }}
+												className="inline-block p-2 hover:bg-surface-container rounded-lg transition-all"
+												onClick={(e) => e.stopPropagation()}
+											>
+												<span className="material-symbols-outlined text-on-surface-variant">
+													edit
+												</span>
+											</Link>
+											<button
+												onClick={(e) => handleDelete(e, monument.id)}
+												className="inline-block p-2 text-error hover:bg-error-container rounded-lg transition-all"
+											>
+												<span className="material-symbols-outlined">
+													delete
+												</span>
+											</button>
+										</div>
+									</td>
+								</tr>
+							))
+						)}
 					</tbody>
 				</table>
 			</div>
 
 			{/* Pagination */}
-			<div className="mt-8 flex justify-center items-center gap-2">
-				<button className="px-3 py-2 bg-surface-container rounded-lg text-on-surface-variant hover:bg-surface-container-high">
-					<span className="material-symbols-outlined">
-						chevron_left
-					</span>
-				</button>
-				{[1, 2, 3, "...", 25].map((num, i) => (
-					<button
-						key={i}
-						className={`px-3 py-2 rounded-lg font-bold ${num === 1 ? "bg-primary text-white" : "bg-surface-container text-on-surface hover:bg-surface-container-high"}`}
+			{pagination.totalPages > 1 && (
+				<div className="mt-8 flex justify-center items-center gap-2">
+					<button 
+						disabled={pagination.page === 1}
+						onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
+						className="px-3 py-2 bg-surface-container rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-50"
 					>
-						{num}
+						<span className="material-symbols-outlined">
+							chevron_left
+						</span>
 					</button>
-				))}
-				<button className="px-3 py-2 bg-surface-container rounded-lg text-on-surface-variant hover:bg-surface-container-high">
-					<span className="material-symbols-outlined">
-						chevron_right
-					</span>
-				</button>
-			</div>
+					{[...Array(pagination.totalPages)].map((_, i) => (
+						<button
+							key={i}
+							onClick={() => setPagination(p => ({ ...p, page: i + 1 }))}
+							className={`px-3 py-2 rounded-lg font-bold ${pagination.page === i + 1 ? "bg-primary text-white" : "bg-surface-container text-on-surface hover:bg-surface-container-high"}`}
+						>
+							{i + 1}
+						</button>
+					))}
+					<button 
+						disabled={pagination.page === pagination.totalPages}
+						onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
+						className="px-3 py-2 bg-surface-container rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-50"
+					>
+						<span className="material-symbols-outlined">
+							chevron_right
+						</span>
+					</button>
+				</div>
+			)}
 		</main>
 	);
 }

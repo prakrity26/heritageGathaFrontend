@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import AdminSidebar from "../components/AdminSidebar";
 
 export default function AdminLayout() {
-	const isLoggedIn = useSelector((state) => state.auth.isLoggedIn);
+	const { isLoggedIn, user } = useSelector((state) => state.auth);
 	const location = useLocation();
 
 	// Auth Guard for all admin routes
@@ -15,6 +15,11 @@ export default function AdminLayout() {
 				replace
 			/>
 		);
+	}
+
+	// Role Guard: Only ADMIN can pass
+	if (user?.role !== "ADMIN") {
+		return <Navigate to="/dashboard" replace />;
 	}
 
 	return (

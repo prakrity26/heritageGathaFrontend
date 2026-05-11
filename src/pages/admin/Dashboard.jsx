@@ -1,200 +1,234 @@
 import { useState, useEffect } from "react";
-
-// ============================================================================
-// EXPECTED API CONTRACTS (FOR BACKEND TEAM)
-// ============================================================================
-// API: GET /api/v1/admin/dashboard/stats
-// Description: Fetches high-level metrics for dashboard cards.
-// Response Example: { totalMonuments: 1284, totalScans: 48200, activeNarrators: 156, ... }
-//
-// API: GET /api/v1/admin/dashboard/activity
-// Description: Fetches the latest system activities (logs, audio generations).
-// Response Example: [{ action: "New Monument Added", time: "2023-10-27T10:00:00Z" }]
+import { Link } from "react-router-dom";
+import adminService from "../../services/admin.service";
+import { toast } from "react-hot-toast";
 
 export default function Dashboard() {
+	const [stats, setStats] = useState({
+		totalMonuments: 0,
+		totalScans: 0,
+		activeNarrators: 0,
+		topPerformingMonuments: [],
+	});
+	const [activity, setActivity] = useState([]);
+	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		const fetchDashboardData = async () => {
+			setLoading(true);
+			try {
+				const [statsRes, activityRes] = await Promise.all([
+					adminService.getDashboardStats(),
+					adminService.getDashboardActivity(),
+				]);
+
+				if (statsRes.success) setStats(statsRes.data);
+				if (activityRes.success) setActivity(activityRes.data);
+			} catch (error) {
+				toast.error("Failed to synchronize archivist data");
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchDashboardData();
+	}, []);
+
+	const quickActions = [
+		{ name: "New Asset", icon: "add_location_alt", link: "/admin/monument/new", color: "bg-primary" },
+		{ name: "Synthesis Hub", icon: "graphic_eq", link: "/admin/audio-gen", color: "bg-secondary" },
+		{ name: "Global Feed", icon: "forum", link: "/admin/feedback", color: "bg-tertiary" },
+		{ name: "System Settings", icon: "settings", link: "/admin/settings", color: "bg-surface-container-high" },
+	];
+
 	return (
-		<main className="p-8 lg:p-12">
-			{/* Header */}
-			<div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-				<div className="max-w-3xl">
-					<h1 className="font-serif text-5xl font-black text-on-background tracking-tight mb-2">
-						The Archivist Dashboard
-					</h1>
-					<p className="text-on-surface-variant font-bold text-lg">
-						Heritage Portal v1.0
-					</p>
-				</div>
-				<div className="flex items-center gap-4">
-					<button className="px-4 py-2 bg-secondary-container text-on-secondary-container rounded-lg font-bold text-sm">
-						<span className="material-symbols-outlined inline mr-2">
-							file_download
+		<main className="p-8 lg:p-12 max-w-[1600px] mx-auto">
+			{/* Header with Glassmorphism */}
+			<div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 mb-12">
+				<div>
+					<div className="flex items-center gap-4 mb-4">
+						<span className="px-4 py-1.5 bg-primary/10 text-primary rounded-full text-xs font-black uppercase tracking-[0.2em] border border-primary/20">
+							Archivist Portal v1.2
 						</span>
-						Export Report
-					</button>
-					<div className="flex -space-x-3">
-						<div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
-							A
-						</div>
-						<div className="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-bold">
-							C
-						</div>
+						<span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+						<span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Live Sync Active</span>
+					</div>
+					<h1 className="font-serif text-5xl xl:text-6xl font-black text-on-background tracking-tight leading-tight">
+						Heritage <span className="text-primary italic">Orchestration</span> Hub
+					</h1>
+				</div>
+
+				<div className="flex items-center gap-4">
+					<div className="flex flex-col items-end">
+						<span className="text-sm font-black text-on-surface uppercase tracking-widest">Senior Archivist</span>
+						<span className="text-xs font-medium text-on-surface-variant">admin@heritagegatha.com</span>
+					</div>
+					<div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-container shadow-lg shadow-primary/20 flex items-center justify-center text-on-primary font-serif text-2xl font-black">
+						A
 					</div>
 				</div>
 			</div>
 
-			{/* Stats Grid */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-				<div className="bg-surface-container-lowest p-6 rounded-xl shadow-lg">
-					<p className="font-label text-xs uppercase tracking-widest text-on-surface-variant font-bold mb-2">
-						Total Monuments
-					</p>
-					<p className="font-serif text-3xl font-bold text-primary mb-1">
-						1,284
-					</p>
-					<p className="text-xs text-on-surface-variant font-body">
-						+12% from last month
-					</p>
-				</div>
-				<div className="bg-surface-container-lowest p-6 rounded-xl shadow-lg">
-					<p className="font-label text-xs uppercase tracking-widest text-on-surface-variant font-bold mb-2">
-						Total Scans
-					</p>
-					<p className="font-serif text-3xl font-bold text-primary mb-1">
-						48.2k
-					</p>
-					<p className="text-xs text-on-surface-variant font-body">
-						+25k from last month
-					</p>
-				</div>
-				<div className="bg-surface-container-lowest p-6 rounded-xl shadow-lg">
-					<p className="font-label text-xs uppercase tracking-widest text-on-surface-variant font-bold mb-2">
-						Active Narrators
-					</p>
-					<p className="font-serif text-3xl font-bold text-primary mb-1">
-						156
-					</p>
-					<p className="text-xs text-on-surface-variant font-body">
-						-2% from last month
-					</p>
-				</div>
-			</div>
+			<div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+				{/* Main Content Area (3 cols) */}
+				<div className="lg:col-span-3 space-y-8">
+					
+					{/* Stats Grid - High Impact */}
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+						{[
+							{ label: "Total Monuments", val: stats.totalMonuments, sub: "Sites Registered", icon: "account_balance" },
+							{ label: "Total Global Scans", val: stats.totalScans, sub: "Visitor Interactions", icon: "qr_code_scanner" },
+							{ label: "Neural Narratives", val: stats.activeNarrators, sub: "Audio Tracks Live", icon: "record_voice_over" },
+						].map((item, i) => (
+							<div key={i} className="bg-surface-container-lowest p-8 rounded-[2rem] border border-surface-container shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 group">
+								<div className="flex justify-between items-start mb-6">
+									<div className="p-3 bg-surface-container-low rounded-2xl text-primary group-hover:scale-110 transition-transform">
+										<span className="material-symbols-outlined text-3xl">{item.icon}</span>
+									</div>
+									<span className="material-symbols-outlined text-on-surface-variant/30 group-hover:text-primary transition-colors">trending_up</span>
+								</div>
+								<p className="text-xs font-black text-on-surface-variant uppercase tracking-[0.2em] mb-2">{item.label}</p>
+								<h3 className="font-serif text-4xl font-black text-on-surface mb-2">
+									{loading ? "..." : item.val.toLocaleString()}
+								</h3>
+								<p className="text-sm font-medium text-on-surface-variant/60">{item.sub}</p>
+							</div>
+						))}
+					</div>
 
-			{/* Charts Section */}
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
-				{/* Engagement Trends */}
-				<div className="bg-surface-container-lowest p-6 rounded-xl shadow-lg">
-					<h2 className="font-serif text-2xl font-bold text-on-surface mb-6">
-						Engagement Trends
-					</h2>
-					<div className="space-y-4">
-						<div className="flex items-center justify-between">
-							<span className="text-sm font-bold text-on-surface">
-								MON
-							</span>
-							<div className="h-32 w-8 bg-surface-container rounded-t-lg flex items-end justify-center pb-2">
-								<div className="h-1/3 w-2 bg-primary rounded-full"></div>
+					{/* Charts & Top Performance */}
+					<div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+						{/* Engagement Visualization */}
+						<div className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-surface-container shadow-sm relative overflow-hidden group">
+							<div className="flex items-center justify-between mb-10">
+								<div>
+									<h2 className="font-serif text-2xl font-black text-on-surface mb-1">Engagement Aura</h2>
+									<p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Weekly Interaction Trends</p>
+								</div>
+								<div className="flex gap-2">
+									{["7D", "30D", "ALL"].map(t => (
+										<button key={t} className="px-3 py-1 text-[10px] font-black rounded-lg bg-surface-container-low hover:bg-primary/10 hover:text-primary transition-all uppercase tracking-widest">{t}</button>
+									))}
+								</div>
+							</div>
+							
+							<div className="flex items-end justify-between h-48 px-4 relative">
+								{/* Grid Lines */}
+								<div className="absolute inset-x-0 bottom-0 top-0 flex flex-col justify-between opacity-10 pointer-events-none">
+									{[1, 2, 3, 4].map(l => <div key={l} className="w-full border-t border-on-surface"></div>)}
+								</div>
+
+								{["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((day, i) => (
+									<div key={day} className="flex flex-col items-center gap-4 group/bar z-10">
+										<div className="relative w-10">
+											<div 
+												className="w-full bg-gradient-to-t from-primary/80 to-primary rounded-xl transition-all duration-700 delay-100 ease-out hover:brightness-125"
+												style={{ height: loading ? '0px' : `${40 + (Math.sin(i) * 30) + 30}%` }}
+											>
+												<div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-on-surface text-surface text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity">
+													{Math.round(40 + (Math.sin(i) * 30) + 30)}%
+												</div>
+											</div>
+										</div>
+										<span className="text-xs font-black text-on-surface-variant/40 tracking-widest group-hover/bar:text-primary transition-colors">{day}</span>
+									</div>
+								))}
+							</div>
+						</div>
+
+						{/* Top Performing Leaderboard */}
+						<div className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-surface-container shadow-sm">
+							<h2 className="font-serif text-2xl font-black text-on-surface mb-8">Asset Leaderboard</h2>
+							<div className="space-y-4">
+								{loading ? (
+									<div className="space-y-4">
+										{[1, 2, 3].map(i => <div key={i} className="h-20 bg-surface-container rounded-2xl animate-pulse"></div>)}
+									</div>
+								) : stats.topPerformingMonuments.length > 0 ? (
+									stats.topPerformingMonuments.map((mon, i) => (
+										<div key={i} className="flex items-center gap-6 p-4 bg-surface-container-low/50 rounded-2xl hover:bg-surface-container-low transition-all group">
+											<div className="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center font-serif text-xl font-black text-primary group-hover:bg-primary group-hover:text-on-primary transition-all">
+												#{i + 1}
+											</div>
+											<div className="flex-1">
+												<h4 className="font-bold text-on-surface text-base mb-1">{mon.name}</h4>
+												<div className="flex items-center gap-2">
+													<div className="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+														<div className="h-full bg-primary transition-all duration-1000" style={{ width: `${mon.engagement}%` }}></div>
+													</div>
+													<span className="text-xs font-black text-primary uppercase tracking-widest w-12 text-right">{mon.engagement}%</span>
+												</div>
+											</div>
+										</div>
+									))
+								) : (
+									<div className="py-20 text-center text-on-surface-variant/40 italic uppercase tracking-widest text-xs">No scan metrics recorded yet</div>
+								)}
 							</div>
 						</div>
 					</div>
-					<div className="flex items-end justify-around h-40 mt-8">
-						{["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-							(day, i) => (
-								<div
-									key={day}
-									className="flex flex-col items-center gap-2"
+				</div>
+
+				{/* Sidebar Command Center */}
+				<div className="space-y-8">
+					{/* Quick Actions */}
+					<section className="bg-surface-container-low p-8 rounded-[2.5rem] border border-surface-container shadow-sm">
+						<h3 className="text-xs uppercase tracking-[0.2em] font-black text-on-surface-variant mb-8 flex items-center gap-2">
+							<span className="material-symbols-outlined text-sm">bolt</span>
+							Command Center
+						</h3>
+						<div className="grid grid-cols-2 gap-4">
+							{quickActions.map((action) => (
+								<Link 
+									key={action.name}
+									to={action.link}
+									className="flex flex-col items-center justify-center p-6 rounded-2xl bg-surface-container-lowest border border-surface-container hover:border-primary/50 hover:shadow-xl hover:-translate-y-1 transition-all group"
 								>
-									<div
-										className="h-24 w-6 bg-surface-container rounded-t"
-										style={{ height: `${25 + i * 8}%` }}
-									></div>
-									<span className="text-xs text-on-surface-variant font-body">
-										{day}
+									<span className={`material-symbols-outlined text-2xl mb-3 text-on-surface-variant group-hover:text-primary transition-colors`}>
+										{action.icon}
 									</span>
-								</div>
-							),
-						)}
-					</div>
-				</div>
-
-				{/* Top Performing Monuments */}
-				<div className="bg-surface-container-lowest p-6 rounded-xl shadow-lg">
-					<h2 className="font-serif text-2xl font-bold text-on-surface mb-6">
-						Top Performing Monuments
-					</h2>
-					<div className="space-y-4">
-						{["Taj Mahal", "Amber Fort", "Hawa Mahal"].map(
-							(name, i) => (
-								<div
-									key={i}
-									className="flex items-center justify-between p-3 bg-surface-container rounded-lg"
-								>
-									<div>
-										<p className="font-bold text-on-surface text-sm">
-											{name}
-										</p>
-										<p className="text-xs text-on-surface-variant">
-											{85 - i * 5}% engagement
-										</p>
-									</div>
-									<div className="w-16 h-8 bg-primary/20 rounded-full flex items-center px-2">
-										<div
-											className="h-1 bg-primary rounded-full"
-											style={{ width: `${85 - i * 5}%` }}
-										></div>
-									</div>
-								</div>
-							),
-						)}
-					</div>
-				</div>
-			</div>
-
-			{/* Recent Activity */}
-			<div className="bg-surface-container-lowest p-6 rounded-xl shadow-lg">
-				<h2 className="font-serif text-2xl font-bold text-on-surface mb-6">
-					Recent Activity
-				</h2>
-				<div className="space-y-4">
-					{[
-						{
-							action: "New Monument Added",
-							description:
-								"Wonders of Graslmünster uploaded to the portal",
-							time: "12 mins ago",
-						},
-						{
-							action: "Audio Narrative Generated",
-							description:
-								'AI-was model "Doric" veneralized synthesis for Luxor Temple',
-							time: "3 hours ago",
-						},
-						{
-							action: "High Rating Alert",
-							description:
-								"Qutub Minar received 50 consecutive 5-star reviews",
-							time: "5 hours ago",
-						},
-					].map((item, i) => (
-						<div
-							key={i}
-							className="flex gap-4 p-4 border-l-4 border-primary bg-surface-container/30 rounded"
-						>
-							<div className="flex-1">
-								<p className="font-bold text-on-surface">
-									{item.action}
-								</p>
-								<p className="text-sm text-on-surface-variant">
-									{item.description}
-								</p>
-								<p className="text-xs text-on-surface-variant mt-1">
-									{item.time}
-								</p>
-							</div>
-							<span className="material-symbols-outlined text-primary">
-								check_circle
-							</span>
+									<span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest text-center leading-tight group-hover:text-on-surface transition-colors">
+										{action.name}
+									</span>
+								</Link>
+							))}
 						</div>
-					))}
+					</section>
+
+					{/* System Chronicle (Activity) */}
+					<section className="bg-surface-container-low p-8 rounded-[2.5rem] border border-surface-container shadow-sm h-[600px] flex flex-col overflow-hidden">
+						<h3 className="text-xs uppercase tracking-[0.2em] font-black text-on-surface-variant mb-8 shrink-0 flex items-center gap-2">
+							<span className="material-symbols-outlined text-sm">history_edu</span>
+							System Chronicle
+						</h3>
+						<div className="space-y-8 overflow-y-auto pr-4 custom-scrollbar">
+							{loading ? (
+								<div className="space-y-8">
+									{[1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-surface-container rounded-xl animate-pulse"></div>)}
+								</div>
+							) : activity.length > 0 ? (
+								activity.map((item, i) => (
+									<div key={i} className="relative pl-8 group">
+										{/* Timeline Line */}
+										<div className="absolute left-[3px] top-2 bottom-0 w-[2px] bg-surface-container-high group-last:hidden"></div>
+										{/* Timeline Dot */}
+										<div className="absolute left-0 top-1.5 w-2 h-2 rounded-full bg-primary ring-4 ring-primary/10"></div>
+										
+										<p className="text-xs font-black text-on-surface uppercase tracking-widest mb-1">{item.action}</p>
+										<p className="text-sm text-on-surface-variant leading-snug mb-2">{item.description}</p>
+										<p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
+											{new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(item.time).toLocaleDateString()}
+										</p>
+									</div>
+								))
+							) : (
+								<div className="flex-1 flex flex-col items-center justify-center opacity-20 text-center px-4">
+									<span className="material-symbols-outlined text-6xl mb-4 font-thin">history</span>
+									<p className="text-xs font-black uppercase tracking-[0.2em]">Chronicle Empty</p>
+								</div>
+							)}
+						</div>
+					</section>
 				</div>
 			</div>
 		</main>

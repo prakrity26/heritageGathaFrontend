@@ -52,6 +52,8 @@ export const API_CONFIG = {
 		// Admin
 		ADMIN: {
 			MONUMENTS: {
+				LIST: "/admin/monuments",
+				DETAIL: (id) => `/admin/monuments/${id}`,
 				CREATE: "/admin/monuments",
 				UPDATE: (id) => `/admin/monuments/${id}`,
 				DELETE: (id) => `/admin/monuments/${id}`,
@@ -61,7 +63,15 @@ export const API_CONFIG = {
 			},
 			DASHBOARD: {
 				STATS: "/admin/dashboard/stats",
+				ACTIVITY: "/admin/dashboard/recent-scans",
 			},
+			FEEDBACK: {
+				LIST: "/admin/feedback",
+			},
+			SETTINGS: {
+				GET: "/admin/settings",
+				UPDATE: "/admin/settings",
+			}
 		},
 	},
 };

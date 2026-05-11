@@ -16,6 +16,32 @@ class HttpClient {
 			response: [],
 			error: [],
 		};
+		this.isRefreshing = false;
+		this.refreshQueue = [];
+		this.refreshHandler = null;
+
+		// Initialize default request interceptor for token management
+		this.addRequestInterceptor((options) => {
+			const token = localStorage.getItem("accessToken");
+			if (token) {
+				return {
+					...options,
+					headers: {
+						...options.headers,
+						Authorization: `Bearer ${token}`,
+					},
+				};
+			}
+			return options;
+		});
+	}
+
+	/**
+	 * Set the handler function for token refresh
+	 * @param {Function} handler - Async function that handles token refresh
+	 */
+	setRefreshHandler(handler) {
+		this.refreshHandler = handler;
 	}
 
 	/**
@@ -37,23 +63,34 @@ class HttpClient {
 					finalOptions = await interceptor(finalOptions);
 				}
 
+				// Prepare headers
+				const headers = {
+					...this.defaultHeaders,
+					...finalOptions.headers,
+				};
+
+				// Handle FormData
+				const isFormData = finalOptions.body instanceof FormData;
+				if (isFormData) {
+					// Let the browser set the Content-Type with boundary
+					delete headers["Content-Type"];
+				}
+
 				// Prepare fetch options
 				const fetchOptions = {
 					method,
-					headers: {
-						...this.defaultHeaders,
-						...finalOptions.headers,
-					},
-					credentials: "include", // For cookies (HttpOnly tokens)
+					headers,
+					credentials: "include",
 					signal: this.getAbortSignal(),
 				};
 
-				// Add body for non-GET requests
+				// Add body
 				if (method !== "GET" && finalOptions.body) {
-					fetchOptions.body =
-						typeof finalOptions.body === "string"
-							? finalOptions.body
-							: JSON.stringify(finalOptions.body);
+					fetchOptions.body = isFormData
+						? finalOptions.body
+						: typeof finalOptions.body === "string"
+						? finalOptions.body
+						: JSON.stringify(finalOptions.body);
 				}
 
 				// Execute fetch
@@ -68,8 +105,62 @@ class HttpClient {
 					finalResponse = await interceptor(finalResponse);
 				}
 
+				if (!finalResponse.ok) {
+					// This will trigger the catch block with the API error
+					await this.parseResponse(finalResponse);
+				}
+
 				return finalResponse;
 			} catch (error) {
+				// Handle 401 Unauthorized (Token Expired)
+				const status = error.status || (error.response && error.response.status);
+				
+				if (status === 401 && this.refreshHandler && !options.skipRefresh) {
+					// If already refreshing, wait for it to complete then retry
+					if (this.isRefreshing) {
+						return new Promise((resolve, reject) => {
+							this.refreshQueue.push({ resolve, reject, method, url, options });
+						});
+					}
+
+					this.isRefreshing = true;
+					
+					try {
+						const refreshSuccess = await this.refreshHandler();
+						
+						if (refreshSuccess) {
+							// Re-run original request
+							const retryResponse = await this.request(method, url, options);
+							
+							// Process the queue
+							const queue = [...this.refreshQueue];
+							this.refreshQueue = [];
+							this.isRefreshing = false;
+							
+							queue.forEach(({ resolve, reject, method, url, options }) => {
+								this.request(method, url, options).then(resolve).catch(reject);
+							});
+							
+							return retryResponse;
+						} else {
+							// Refresh failed
+							const queue = [...this.refreshQueue];
+							this.refreshQueue = [];
+							this.isRefreshing = false;
+							
+							queue.forEach(({ reject }) => reject(error));
+							throw error;
+						}
+					} catch (refreshError) {
+						const queue = [...this.refreshQueue];
+						this.refreshQueue = [];
+						this.isRefreshing = false;
+						
+						queue.forEach(({ reject }) => reject(refreshError));
+						throw refreshError;
+					}
+				}
+
 				// Apply error interceptors
 				for (const interceptor of this.interceptors.error) {
 					await interceptor(error);
@@ -80,10 +171,8 @@ class HttpClient {
 				// Retry logic for network errors and 5xx status codes
 				if (
 					attempt < maxAttempts &&
-					(this.isNetworkError(error) ||
-						(error.response && error.response.status >= 500))
+					(this.isNetworkError(error) || (status >= 500))
 				) {
-					// Exponential backoff
 					await this.delay(
 						API_CONFIG.RETRY_DELAY * Math.pow(2, attempt - 1),
 					);

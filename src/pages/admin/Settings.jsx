@@ -4,7 +4,57 @@
 // API: GET /api/v1/admin/settings
 // API: PUT /api/v1/admin/settings
 
+import { useState, useEffect } from "react";
+import adminService from "../../services/admin.service";
+
 export default function Settings() {
+	const [settings, setSettings] = useState({
+		visionEndpoint: "",
+		xttsEndpoint: "",
+		autoArchiveHighConfidence: false,
+		audioCacheSize: 0,
+		scanArtifactsSize: 0,
+	});
+	const [loading, setLoading] = useState(true);
+	const [saving, setSaving] = useState(false);
+
+	useEffect(() => {
+		const fetchSettings = async () => {
+			try {
+				const res = await adminService.getSettings();
+				if (res.success) {
+					setSettings(res.data);
+				}
+			} catch (error) {
+				console.error("Failed to fetch settings:", error);
+			} finally {
+				setLoading(false);
+			}
+		};
+		fetchSettings();
+	}, []);
+
+	const handleSave = async () => {
+		setSaving(true);
+		try {
+			const res = await adminService.updateSettings(settings);
+			if (res.success) {
+				alert("Settings saved successfully");
+			} else {
+				alert(res.message || "Failed to save settings");
+			}
+		} catch (error) {
+			console.error(error);
+			alert("An error occurred while saving");
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	if (loading) {
+		return <div className="p-12 text-center text-on-surface-variant">Loading settings...</div>;
+	}
+
 	return (
 		<main className="p-8 lg:p-12">
 			<div className="max-w-3xl mb-12">
@@ -30,7 +80,8 @@ export default function Settings() {
 							</label>
 							<input
 								type="text"
-								defaultValue="https://ml-api.heritagegatha.com/v1/vision"
+								value={settings.visionEndpoint || ""}
+								onChange={(e) => setSettings({ ...settings, visionEndpoint: e.target.value })}
 								className="w-full px-4 py-3 bg-surface-container-low border border-outline text-on-surface focus:border-primary rounded-lg focus:outline-none transition-colors"
 							/>
 						</div>
@@ -40,7 +91,8 @@ export default function Settings() {
 							</label>
 							<input
 								type="text"
-								defaultValue="https://ml-api.heritagegatha.com/v1/xtts"
+								value={settings.xttsEndpoint || ""}
+								onChange={(e) => setSettings({ ...settings, xttsEndpoint: e.target.value })}
 								className="w-full px-4 py-3 bg-surface-container-low border border-outline text-on-surface focus:border-primary rounded-lg focus:outline-none transition-colors"
 							/>
 						</div>
@@ -58,7 +110,8 @@ export default function Settings() {
 								<input
 									type="checkbox"
 									className="sr-only peer"
-									defaultChecked
+									checked={settings.autoArchiveHighConfidence || false}
+									onChange={(e) => setSettings({ ...settings, autoArchiveHighConfidence: e.target.checked })}
 								/>
 								<div className="w-11 h-6 bg-surface-container-high peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
 							</label>
@@ -78,7 +131,7 @@ export default function Settings() {
 							</p>
 							<div className="flex items-end gap-2">
 								<p className="font-serif text-3xl font-bold text-on-surface">
-									14.2
+									{settings.audioCacheSize || "0.0"}
 								</p>
 								<p className="text-sm text-on-surface-variant mb-1">
 									GB
@@ -94,7 +147,7 @@ export default function Settings() {
 							</p>
 							<div className="flex items-end gap-2">
 								<p className="font-serif text-3xl font-bold text-on-surface">
-									45.8
+									{settings.scanArtifactsSize || "0.0"}
 								</p>
 								<p className="text-sm text-on-surface-variant mb-1">
 									GB
@@ -111,8 +164,12 @@ export default function Settings() {
 					<button className="px-6 py-3 text-on-surface font-bold hover:bg-surface-container rounded-lg transition-all">
 						Discard Changes
 					</button>
-					<button className="px-6 py-3 bg-primary text-white font-bold rounded-lg hover:opacity-90 transition-all shadow-lg">
-						Save Configuration
+					<button 
+						onClick={handleSave}
+						disabled={saving}
+						className="px-6 py-3 bg-primary text-white font-bold rounded-lg hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
+					>
+						{saving ? "Saving..." : "Save Configuration"}
 					</button>
 				</div>
 			</div>

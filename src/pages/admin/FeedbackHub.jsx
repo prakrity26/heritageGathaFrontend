@@ -5,7 +5,39 @@
 // Description: Fetches paginated user feedback logs including model performance reports.
 // Response Example: { "total": 1200, "average_rating": 4.8, feedbacks: [{ ... }] }
 
+import { useState, useEffect } from "react";
+import adminService from "../../services/admin.service";
+
 export default function FeedbackHub() {
+	const [data, setData] = useState({ systemHealth: {}, feedbacks: [] });
+	const [loading, setLoading] = useState(true);
+	const [filter, setFilter] = useState("all");
+
+	useEffect(() => {
+		const fetchData = async () => {
+			try {
+				const res = await adminService.getFeedbackHub();
+				if (res.success) {
+					setData(res.data);
+				}
+			} catch (error) {
+				console.error("Failed to fetch feedback data:", error);
+			} finally {
+				setLoading(false);
+			}
+		};
+		fetchData();
+	}, []);
+
+	const filteredFeedbacks = data.feedbacks?.filter((f) => 
+		filter === "all" || 
+		(filter === "needs-attention" && f.rating <= 3)
+	) || [];
+
+	if (loading) {
+		return <div className="p-12 text-center text-on-surface-variant">Loading feedback data...</div>;
+	}
+
 	return (
 		<main className="p-8 lg:p-12">
 			{/* Header */}
@@ -38,11 +70,11 @@ export default function FeedbackHub() {
 						System Health
 					</p>
 					<p className="font-serif text-5xl font-bold text-primary mb-1">
-						4.8
+						{data.systemHealth?.averageRating?.toFixed(1) || "0.0"}
 					</p>
-					<p className="text-sm text-on-surface-variant mb-4">/5.0</p>
+					<p className="text-sm text-on-surface-variant mb-4">/5.0 based on {data.systemHealth?.totalReviews || 0} reviews</p>
 					<p className="text-xs text-on-surface-variant">
-						{">"}+2.6% from last week
+						Real-time system accuracy
 					</p>
 				</div>
 
@@ -58,11 +90,11 @@ export default function FeedbackHub() {
 									Vision (CNN)
 								</span>
 								<span className="text-sm font-bold text-primary">
-									94%
+									{data.systemHealth?.visionPrecision || 0}%
 								</span>
 							</div>
 							<div className="h-2 bg-surface-container rounded-full overflow-hidden">
-								<div className="h-full w-11/12 bg-primary"></div>
+								<div className="h-full bg-primary" style={{ width: `${data.systemHealth?.visionPrecision || 0}%` }}></div>
 							</div>
 						</div>
 						<div>
@@ -71,11 +103,11 @@ export default function FeedbackHub() {
 									Narrative (NTT)
 								</span>
 								<span className="text-sm font-bold text-primary">
-									88%
+									{data.systemHealth?.narrativePrecision || 0}%
 								</span>
 							</div>
 							<div className="h-2 bg-surface-container rounded-full overflow-hidden">
-								<div className="h-full w-10/12 bg-primary"></div>
+								<div className="h-full bg-primary" style={{ width: `${data.systemHealth?.narrativePrecision || 0}%` }}></div>
 							</div>
 						</div>
 					</div>
@@ -90,48 +122,26 @@ export default function FeedbackHub() {
 
 				{/* Filter Tabs */}
 				<div className="flex gap-2 flex-wrap">
-					<button className="px-4 py-2 bg-primary text-white rounded-full text-xs font-bold">
+					<button 
+						onClick={() => setFilter("all")}
+						className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${filter === "all" ? "bg-primary text-white" : "bg-surface-container text-on-surface hover:bg-surface-container-high"}`}
+					>
 						All Reviews
 					</button>
-					<button className="px-4 py-2 bg-surface-container text-on-surface rounded-full text-xs font-bold hover:bg-surface-container-high transition-all">
+					<button 
+						onClick={() => setFilter("needs-attention")}
+						className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${filter === "needs-attention" ? "bg-primary text-white" : "bg-surface-container text-on-surface hover:bg-surface-container-high"}`}
+					>
 						Needs Attention
 					</button>
 				</div>
 
 				{/* Feedback Items */}
 				<div className="space-y-4">
-					{[
-						{
-							monument: "Taj Mahal Narrative",
-							author: "ASIAM SINGH",
-							time: "3 hours ago",
-							rating: 5,
-							sentiment: "positive",
-							content:
-								'"The audio generation for the dacrylatory of the dome construction was incredibly vivid. It felt like I was back in the 17th century!"',
-							status: "POSITIVE",
-						},
-						{
-							monument: "Hawa Mahal Audio Fault",
-							author: "ELENA FISCHER",
-							time: "5 hours ago",
-							rating: 1,
-							sentiment: "negative",
-							content:
-								'"The TTS model struggled with the local pronunciation of "Havelis". It sounded robotic and broke the immersion."',
-							status: "NEGATIVE",
-						},
-						{
-							monument: "Qutub Minar Landmark",
-							author: "MARCUS",
-							time: "8 hours ago",
-							rating: 4,
-							sentiment: "neutral",
-							content:
-								'"Recognition was fast. But the narrative content is a bit too brief. Would love deeper context."',
-							status: "NEUTRAL",
-						},
-					].map((feedback, i) => (
+					{filteredFeedbacks.length === 0 ? (
+						<div className="py-8 text-center text-on-surface-variant">No feedback found.</div>
+					) : (
+						filteredFeedbacks.map((feedback) => (
 						<div
 							key={i}
 							className={`p-6 rounded-xl border-l-4 ${
@@ -191,7 +201,8 @@ export default function FeedbackHub() {
 								</button>
 							</div>
 						</div>
-					))}
+					))
+					)}
 				</div>
 
 				{/* Load More */}

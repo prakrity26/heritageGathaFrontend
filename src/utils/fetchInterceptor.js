@@ -19,12 +19,28 @@ export function initializeFetchInterceptor() {
 		const options = args[1] || {};
 		const startTime = Date.now();
 
+		// Safely parse body for logging
+		let parsedBody = null;
+		if (options.body) {
+			if (options.body instanceof FormData) {
+				parsedBody = "[FormData]";
+			} else if (typeof options.body === "string") {
+				try {
+					parsedBody = JSON.parse(options.body);
+				} catch (e) {
+					parsedBody = "[Non-JSON String Body]";
+				}
+			} else {
+				parsedBody = "[Object Body]";
+			}
+		}
+
 		// Log the request
 		const requestId = apiLogger.logRequest({
 			url: typeof url === "string" ? url : url.url,
 			method: options.method || "GET",
 			headers: options.headers,
-			body: options.body ? JSON.parse(options.body) : null,
+			body: parsedBody,
 		});
 
 		// Call original fetch

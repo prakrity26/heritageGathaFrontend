@@ -4,6 +4,7 @@ import {
 	Route,
 	Navigate,
 } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import "./App.css";
 
 // Public Pages
@@ -21,6 +22,7 @@ import AnalyzingMonument from "./pages/admin/AnalyzingMonument";
 import FeedbackHub from "./pages/admin/FeedbackHub";
 import AudioGeneration from "./pages/admin/AudioGeneration";
 import Settings from "./pages/admin/Settings";
+import UserDashboard from "./pages/UserDashboard";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
@@ -29,6 +31,7 @@ import PublicLayout from "./layouts/PublicLayout";
 export default function App() {
 	return (
 		<Router>
+			<Toaster position="top-right" />
 			<Routes>
 				{/* Public Routes */}
 				<Route element={<PublicLayout />}>
@@ -40,6 +43,7 @@ export default function App() {
 						path="/monument/:id/feedback"
 						element={<ProvideFeedback />}
 					/>
+					<Route path="/dashboard" element={<UserDashboard />} />
 				</Route>
 
 				{/* Admin Routes */}
@@ -78,3 +82,4 @@ export default function App() {
 		</Router>
 	);
 }
+

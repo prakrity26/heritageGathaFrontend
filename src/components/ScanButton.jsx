@@ -1,5 +1,7 @@
 import { useRef, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Webcam from "react-webcam";
+import API_CONFIG from "../services/api.config";
 
 /**
  * ---------------------------------------------------------------------------
@@ -45,6 +47,7 @@ import Webcam from "react-webcam";
  */
 
 export default function ScanButton() {
+	const navigate = useNavigate();
 	const webcamRef = useRef(null);
 	const canvasRef = useRef(null);
 	const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -113,49 +116,81 @@ export default function ScanButton() {
 		setIsAnalyzing(false);
 	};
 
+	const [loadingMessage, setLoadingMessage] = useState("");
+
 	const handleAnalyze = async () => {
 		if (!capturedImage) return;
 
 		setIsAnalyzing(true);
 		setError(null);
+		setLoadingMessage("Acquiring location...");
 
 		try {
-			// Convert base64 Data URL to a Blob for multipart/form-data upload (preferred)
-			// const res = await fetch(capturedImage);
-			// const blob = await res.blob();
-			// const formData = new FormData();
-			// formData.append('image', blob, 'monument-scan.jpg');
+			// 1. Get current geolocation
+			const getLocation = () => {
+				return new Promise((resolve, reject) => {
+					if (!navigator.geolocation) {
+						reject(new Error("Geolocation not supported"));
+					}
+					navigator.geolocation.getCurrentPosition(resolve, reject, {
+						enableHighAccuracy: true,
+						timeout: 10000,
+						maximumAge: 0
+					});
+				});
+			};
 
-			// Replace this block with your actual fetch call
-			// const response = await fetch('/api/v1/vision/analyze', {
-			//     method: 'POST',
-			//     // Note: No Authorization header needed, accessible to guests
-			//     body: formData // or JSON.stringify({ image_data: capturedImage })
-			// });
-			// if (!response.ok) throw new Error("Analysis failed");
-			// const result = await response.json();
+			let position;
+			try {
+				position = await getLocation();
+			} catch (geoErr) {
+				console.error("Geo error:", geoErr);
+				setError("Location access required for monument verification.");
+				setIsAnalyzing(false);
+				return;
+			}
 
-			// Fake delay to simulate backend processing
-			await new Promise((resolve) => setTimeout(resolve, 2000));
+			const { latitude, longitude } = position.coords;
+			setLoadingMessage("Analyzing monument...");
 
-			// Mock success result payload
+			// 2. Convert base64 to Blob
+			const response = await fetch(capturedImage);
+			const blob = await response.blob();
+			
+			// 3. Prepare FormData
+			const formData = new FormData();
+			formData.append("image", blob, "monument-scan.jpg");
+			formData.append("userLat", latitude);
+			formData.append("userLng", longitude);
+
+			// 4. Send to Backend using native fetch (since it's a public multipart request)
+			const apiUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.VISION.ANALYZE}`;
+			const apiRes = await fetch(apiUrl, {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await apiRes.json();
+
+			if (!apiRes.ok || result.status !== "success") {
+				setError(result.message || result.error || "Identification failed. Please try again.");
+				return;
+			}
+
+			// 5. Success State
 			setAnalysisResult({
 				success: true,
 				data: {
-					monument_id: "m_001",
-					name: "Patan Durbar Square",
-					confidence_score: 0.98,
+					monument_id: result.data.monument.id,
+					name: result.data.monument.name,
+					confidence_score: result.data.confidence,
+					distance: result.data.distance
 				},
 			});
 
-			console.log(
-				"Image payload sent:",
-				capturedImage.substring(0, 50) + "...",
-			);
-			console.log("Analysis Result: Patan Durbar Square [0.98]");
 		} catch (err) {
 			console.error("Analysis API failed:", err);
-			setError("Analysis unsuccessful. Try again.");
+			setError(err.message || "Network error. Please try again.");
 		} finally {
 			setIsAnalyzing(false);
 		}
@@ -287,8 +322,7 @@ export default function ScanButton() {
 										{/* CSS Spinner */}
 										<div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin shadow-lg"></div>
 										<p className="text-white mt-4 font-semibold text-lg drop-shadow-lg animate-pulse">
-											Analyzing structure via Vision
-											API...
+											{loadingMessage}
 										</p>
 									</div>
 								)}
@@ -321,10 +355,9 @@ export default function ScanButton() {
 											</button>
 											<button
 												onClick={() => {
-													console.log(
-														`Navigating to Monument ID: ${analysisResult.data.monument_id}`,
-													);
+													const id = analysisResult.data.monument_id;
 													closeCam();
+													navigate(`/monument/${id}`);
 												}}
 												className="px-6 py-2 bg-primary text-white font-bold rounded-full hover:bg-primary-container transition-all text-sm shadow-md"
 											>

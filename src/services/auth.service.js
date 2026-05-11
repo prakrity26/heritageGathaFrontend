@@ -8,6 +8,13 @@ import httpClient from "./http.client";
 import API_CONFIG from "./api.config";
 
 class AuthService {
+	constructor() {
+		// Register the refresh handler to enable silent token rotation
+		httpClient.setRefreshHandler(async () => {
+			const result = await this.refreshToken();
+			return result.success;
+		});
+	}
 	/**
 	 * Register new user
 	 * @param {Object} payload - Registration data
@@ -174,11 +181,17 @@ class AuthService {
 				{
 					refreshToken,
 				},
+				{
+					skipRefresh: true, // Prevent infinite loop if refresh token is also expired
+				}
 			);
 
-			// Update access token
+			// Update tokens
 			if (response.data?.accessToken) {
 				localStorage.setItem("accessToken", response.data.accessToken);
+			}
+			if (response.data?.refreshToken) {
+				localStorage.setItem("refreshToken", response.data.refreshToken);
 			}
 
 			return {
