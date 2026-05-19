@@ -12,7 +12,9 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import OTPVerification from "./pages/OTPVerification";
 import MonumentDetail from "./pages/MonumentDetail";
+import MonumentExplorer from "./pages/MonumentExplorer";
 import ProvideFeedback from "./pages/ProvideFeedback";
+import ScanError from "./pages/ScanError";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -33,12 +35,17 @@ export default function App() {
 		<Router>
 			<Toaster position="top-right" />
 			<Routes>
+				{/* Standalone full-screen pages */}
+				<Route path="/scan-error" element={<ScanError />} />
+
 				{/* Public Routes */}
 				<Route element={<PublicLayout />}>
+
 					<Route path="/" element={<Home />} />
 					<Route path="/login" element={<Login />} />{" "}
 					<Route path="/verify-otp" element={<OTPVerification />} />{" "}
 					<Route path="/monument/:id" element={<MonumentDetail />} />
+					<Route path="/monuments" element={<MonumentExplorer />} />
 					<Route
 						path="/monument/:id/feedback"
 						element={<ProvideFeedback />}

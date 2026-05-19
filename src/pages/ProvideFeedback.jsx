@@ -42,8 +42,14 @@ export default function ProvideFeedback() {
 					setMonument(monRes.data);
 				}
 				
-				if (revRes.success && revRes.data?.length > 0) {
-					setRecentReviews(revRes.data.slice(0, 2));
+				if (revRes.success && Array.isArray(revRes.data) && revRes.data.length > 0) {
+					const formatted = revRes.data.slice(0, 3).map(r => ({
+						id: r.id,
+						author: r.user?.full_name || "Anonymous Archivist",
+						rating: r.rating,
+						comment: r.comment
+					}));
+					setRecentReviews(formatted);
 				} else {
 					setRecentReviews([
 						{ id: "f1", author: "Heritage Guide", rating: 5, comment: "Be the first to share your journey with this artifact!" }

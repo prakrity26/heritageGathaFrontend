@@ -22,6 +22,17 @@ class MonumentService {
 		return { success: false, message: defaultMessage || ERROR_MESSAGES.UNKNOWN_ERROR };
 	}
 
+	async getAllMonuments(params = {}) {
+		try {
+			const res = await httpClient.get("/monuments", { params });
+			// The backend SuccessResponse puts the main data (monuments array) in res.data
+			// and pagination in res.pagination
+			return { success: true, data: res.data, pagination: res.pagination };
+		} catch (error) {
+			return this.handleError(error, "Failed to fetch monuments");
+		}
+	}
+
 	async getMonumentById(id) {
 		try {
 			const res = await httpClient.get(API_CONFIG.ENDPOINTS.MONUMENTS.DETAIL(id));

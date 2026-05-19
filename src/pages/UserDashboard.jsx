@@ -64,11 +64,11 @@ export default function UserDashboard() {
 						<div className="w-full h-3 bg-surface-container-high rounded-full overflow-hidden mb-3">
 							<div 
 								className="h-full bg-primary transition-all duration-1000" 
-								style={{ width: `${((data?.stats?.totalScans % 5) / 5) * 100}%` }}
+								style={{ width: `${data?.stats?.discoveryProgress || 0}%` }}
 							></div>
 						</div>
 						<p className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">
-							{5 - (data?.stats?.totalScans % 5)} scans until next milestone
+							{data?.stats?.discoveryProgress || 0}% of live archives discovered
 						</p>
 					</div>
 				</div>

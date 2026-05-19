@@ -8,7 +8,7 @@ export default function Dashboard() {
 		totalMonuments: 0,
 		totalScans: 0,
 		activeNarrators: 0,
-		topPerformingMonuments: [],
+		monumentPopularity: [],
 	});
 	const [activity, setActivity] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -33,13 +33,6 @@ export default function Dashboard() {
 
 		fetchDashboardData();
 	}, []);
-
-	const quickActions = [
-		{ name: "New Asset", icon: "add_location_alt", link: "/admin/monument/new", color: "bg-primary" },
-		{ name: "Synthesis Hub", icon: "graphic_eq", link: "/admin/audio-gen", color: "bg-secondary" },
-		{ name: "Global Feed", icon: "forum", link: "/admin/feedback", color: "bg-tertiary" },
-		{ name: "System Settings", icon: "settings", link: "/admin/settings", color: "bg-surface-container-high" },
-	];
 
 	return (
 		<main className="p-8 lg:p-12 max-w-[1600px] mx-auto">
@@ -96,7 +89,7 @@ export default function Dashboard() {
 						))}
 					</div>
 
-					{/* Charts & Top Performance */}
+					{/* Charts & Popularity Ledger */}
 					<div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
 						{/* Engagement Visualization */}
 						<div className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-surface-container shadow-sm relative overflow-hidden group">
@@ -105,15 +98,9 @@ export default function Dashboard() {
 									<h2 className="font-serif text-2xl font-black text-on-surface mb-1">Engagement Aura</h2>
 									<p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Weekly Interaction Trends</p>
 								</div>
-								<div className="flex gap-2">
-									{["7D", "30D", "ALL"].map(t => (
-										<button key={t} className="px-3 py-1 text-[10px] font-black rounded-lg bg-surface-container-low hover:bg-primary/10 hover:text-primary transition-all uppercase tracking-widest">{t}</button>
-									))}
-								</div>
 							</div>
 							
 							<div className="flex items-end justify-between h-48 px-4 relative">
-								{/* Grid Lines */}
 								<div className="absolute inset-x-0 bottom-0 top-0 flex flex-col justify-between opacity-10 pointer-events-none">
 									{[1, 2, 3, 4].map(l => <div key={l} className="w-full border-t border-on-surface"></div>)}
 								</div>
@@ -124,11 +111,7 @@ export default function Dashboard() {
 											<div 
 												className="w-full bg-gradient-to-t from-primary/80 to-primary rounded-xl transition-all duration-700 delay-100 ease-out hover:brightness-125"
 												style={{ height: loading ? '0px' : `${40 + (Math.sin(i) * 30) + 30}%` }}
-											>
-												<div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-on-surface text-surface text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity">
-													{Math.round(40 + (Math.sin(i) * 30) + 30)}%
-												</div>
-											</div>
+											></div>
 										</div>
 										<span className="text-xs font-black text-on-surface-variant/40 tracking-widest group-hover/bar:text-primary transition-colors">{day}</span>
 									</div>
@@ -136,28 +119,26 @@ export default function Dashboard() {
 							</div>
 						</div>
 
-						{/* Top Performing Leaderboard */}
+						{/* Global Monument Popularity */}
 						<div className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-surface-container shadow-sm">
-							<h2 className="font-serif text-2xl font-black text-on-surface mb-8">Asset Leaderboard</h2>
-							<div className="space-y-4">
+							<h2 className="font-serif text-2xl font-black text-on-surface mb-8">Monument Popularity</h2>
+							<div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
 								{loading ? (
 									<div className="space-y-4">
 										{[1, 2, 3].map(i => <div key={i} className="h-20 bg-surface-container rounded-2xl animate-pulse"></div>)}
 									</div>
-								) : stats.topPerformingMonuments.length > 0 ? (
-									stats.topPerformingMonuments.map((mon, i) => (
-										<div key={i} className="flex items-center gap-6 p-4 bg-surface-container-low/50 rounded-2xl hover:bg-surface-container-low transition-all group">
-											<div className="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center font-serif text-xl font-black text-primary group-hover:bg-primary group-hover:text-on-primary transition-all">
-												#{i + 1}
-											</div>
-											<div className="flex-1">
-												<h4 className="font-bold text-on-surface text-base mb-1">{mon.name}</h4>
-												<div className="flex items-center gap-2">
-													<div className="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
-														<div className="h-full bg-primary transition-all duration-1000" style={{ width: `${mon.engagement}%` }}></div>
-													</div>
-													<span className="text-xs font-black text-primary uppercase tracking-widest w-12 text-right">{mon.engagement}%</span>
+								) : stats.monumentPopularity.length > 0 ? (
+									stats.monumentPopularity.map((mon, i) => (
+										<div key={mon.id} className="flex items-center justify-between p-4 bg-surface-container-low/50 rounded-2xl hover:bg-surface-container-low transition-all group">
+											<div className="flex items-center gap-4">
+												<div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary">
+													{i + 1}
 												</div>
+												<h4 className="font-bold text-on-surface text-sm">{mon.name}</h4>
+											</div>
+											<div className="flex flex-col items-end">
+												<span className="text-lg font-black text-primary">{mon.scans}</span>
+												<span className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant/40">Total Scans</span>
 											</div>
 										</div>
 									))
@@ -169,53 +150,30 @@ export default function Dashboard() {
 					</div>
 				</div>
 
-				{/* Sidebar Command Center */}
+				{/* Sidebar Discovery Chronicle */}
 				<div className="space-y-8">
-					{/* Quick Actions */}
-					<section className="bg-surface-container-low p-8 rounded-[2.5rem] border border-surface-container shadow-sm">
-						<h3 className="text-xs uppercase tracking-[0.2em] font-black text-on-surface-variant mb-8 flex items-center gap-2">
-							<span className="material-symbols-outlined text-sm">bolt</span>
-							Command Center
-						</h3>
-						<div className="grid grid-cols-2 gap-4">
-							{quickActions.map((action) => (
-								<Link 
-									key={action.name}
-									to={action.link}
-									className="flex flex-col items-center justify-center p-6 rounded-2xl bg-surface-container-lowest border border-surface-container hover:border-primary/50 hover:shadow-xl hover:-translate-y-1 transition-all group"
-								>
-									<span className={`material-symbols-outlined text-2xl mb-3 text-on-surface-variant group-hover:text-primary transition-colors`}>
-										{action.icon}
-									</span>
-									<span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest text-center leading-tight group-hover:text-on-surface transition-colors">
-										{action.name}
-									</span>
-								</Link>
-							))}
+					{/* Live Identification Feed */}
+					<section className="bg-surface-container-low p-8 rounded-[2.5rem] border border-surface-container shadow-sm h-[700px] flex flex-col overflow-hidden">
+						<div className="flex items-center justify-between mb-8 shrink-0">
+							<h3 className="text-xs uppercase tracking-[0.2em] font-black text-on-surface-variant flex items-center gap-2">
+								<span className="material-symbols-outlined text-sm">history_edu</span>
+								Discovery Feed
+							</h3>
+							<span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
 						</div>
-					</section>
-
-					{/* System Chronicle (Activity) */}
-					<section className="bg-surface-container-low p-8 rounded-[2.5rem] border border-surface-container shadow-sm h-[600px] flex flex-col overflow-hidden">
-						<h3 className="text-xs uppercase tracking-[0.2em] font-black text-on-surface-variant mb-8 shrink-0 flex items-center gap-2">
-							<span className="material-symbols-outlined text-sm">history_edu</span>
-							System Chronicle
-						</h3>
 						<div className="space-y-8 overflow-y-auto pr-4 custom-scrollbar">
 							{loading ? (
 								<div className="space-y-8">
-									{[1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-surface-container rounded-xl animate-pulse"></div>)}
+									{[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 bg-surface-container rounded-xl animate-pulse"></div>)}
 								</div>
 							) : activity.length > 0 ? (
 								activity.map((item, i) => (
 									<div key={i} className="relative pl-8 group">
-										{/* Timeline Line */}
 										<div className="absolute left-[3px] top-2 bottom-0 w-[2px] bg-surface-container-high group-last:hidden"></div>
-										{/* Timeline Dot */}
 										<div className="absolute left-0 top-1.5 w-2 h-2 rounded-full bg-primary ring-4 ring-primary/10"></div>
 										
 										<p className="text-xs font-black text-on-surface uppercase tracking-widest mb-1">{item.action}</p>
-										<p className="text-sm text-on-surface-variant leading-snug mb-2">{item.description}</p>
+										<p className="text-sm text-on-surface-variant leading-snug mb-2 font-medium">{item.description}</p>
 										<p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
 											{new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(item.time).toLocaleDateString()}
 										</p>

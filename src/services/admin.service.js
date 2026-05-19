@@ -267,6 +267,13 @@ class AdminService {
 		);
 	}
 
+	async deleteReview(reviewId) {
+		return await this.handleRequest(
+			httpClient.delete(`/admin/feedback/reviews/${reviewId}`),
+			"delete review"
+		);
+	}
+
 	async getSettings() {
 		return await this.handleRequest(
 			httpClient.get(API_CONFIG.ENDPOINTS.ADMIN.SETTINGS.GET),

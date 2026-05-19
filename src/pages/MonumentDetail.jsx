@@ -179,15 +179,15 @@ export default function MonumentDetail() {
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-surface-container-lowest rounded-[2.5rem] border border-surface-container shadow-sm">
 								<div className="text-center md:border-r border-surface-container">
 									<p className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest mb-1">Global Scans</p>
-									<p className="text-xl font-serif font-black text-primary">{(monument.total_scans || 0).toLocaleString()}</p>
+									<p className="text-xl font-serif font-black text-primary">{(monument.totalScans || 0).toLocaleString()}</p>
 								</div>
 								<div className="text-center md:border-r border-surface-container">
 									<p className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest mb-1">Avg Rating</p>
-									<p className="text-xl font-serif font-black text-primary">{(monument.average_rating || 4.8).toFixed(1)}</p>
+									<p className="text-xl font-serif font-black text-primary">{(monument.averageRating || 0).toFixed(1)}</p>
 								</div>
 								<div className="text-center md:border-r border-surface-container">
-									<p className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest mb-1">Authenticity</p>
-									<p className="text-xl font-serif font-black text-primary">High</p>
+									<p className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest mb-1">Reviews</p>
+									<p className="text-xl font-serif font-black text-primary">{monument.reviewCount || 0}</p>
 								</div>
 								<div className="text-center">
 									<p className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest mb-1">Era</p>
@@ -279,12 +279,13 @@ export default function MonumentDetail() {
 						{/* Feedback Card */}
 						<section className="bg-surface-container-low p-8 rounded-[2.5rem] border border-surface-container shadow-sm text-center">
 							<p className="text-xs font-black text-on-surface-variant uppercase tracking-[0.2em] mb-4">Community Reverence</p>
-							<div className="text-5xl font-serif font-black text-primary mb-2">{(monument.average_rating || 4.8).toFixed(1)}</div>
-							<div className="flex justify-center gap-1 mb-8">
+							<div className="text-5xl font-serif font-black text-primary mb-2">{(monument.averageRating || 0).toFixed(1)}</div>
+							<div className="flex justify-center gap-1 mb-2">
 								{[1, 2, 3, 4, 5].map(i => (
-									<span key={i} className="material-symbols-outlined text-secondary text-2xl font-bold">star</span>
+									<span key={i} className={`material-symbols-outlined text-secondary text-2xl font-bold ${i <= Math.round(monument.averageRating || 0) ? "filled" : "opacity-20"}`}>star</span>
 								))}
 							</div>
+							<p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-8 opacity-60">Based on {monument.reviewCount || 0} chronicles</p>
 							<Link
 								to={isLoggedIn ? `/monument/${id}/feedback` : `/login`}
 								state={{ returnUrl: `/monument/${id}/feedback` }}

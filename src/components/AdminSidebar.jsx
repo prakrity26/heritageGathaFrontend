@@ -27,7 +27,7 @@ export default function AdminSidebar() {
 			label: "Audio Generation",
 		},
 		{ path: "/admin/feedback", icon: "reviews", label: "Feedback" },
-		{ path: "/admin/settings", icon: "settings", label: "Settings" },
+		// { path: "/admin/settings", icon: "settings", label: "Settings" },
 	];
 
 	return (

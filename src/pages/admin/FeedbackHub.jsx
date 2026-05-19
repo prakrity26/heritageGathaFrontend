@@ -1,214 +1,177 @@
-// ============================================================================
-// EXPECTED API CONTRACTS (FOR BACKEND TEAM)
-// ============================================================================
-// API: GET /api/v1/admin/feedback
-// Description: Fetches paginated user feedback logs including model performance reports.
-// Response Example: { "total": 1200, "average_rating": 4.8, feedbacks: [{ ... }] }
-
 import { useState, useEffect } from "react";
 import adminService from "../../services/admin.service";
 
 export default function FeedbackHub() {
-	const [data, setData] = useState({ systemHealth: {}, feedbacks: [] });
+	const [monuments, setMonuments] = useState([]);
+	const [reviews, setReviews] = useState([]);
 	const [loading, setLoading] = useState(true);
-	const [filter, setFilter] = useState("all");
+	const [activeTab, setActiveTab] = useState(null);
+	const [isDeleting, setIsDeleting] = useState(null);
 
 	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				const res = await adminService.getFeedbackHub();
-				if (res.success) {
-					setData(res.data);
-				}
-			} catch (error) {
-				console.error("Failed to fetch feedback data:", error);
-			} finally {
-				setLoading(false);
-			}
-		};
 		fetchData();
 	}, []);
 
-	const filteredFeedbacks = data.feedbacks?.filter((f) => 
-		filter === "all" || 
-		(filter === "needs-attention" && f.rating <= 3)
-	) || [];
+	const fetchData = async () => {
+		setLoading(true);
+		try {
+			const res = await adminService.getFeedbackHub();
+			if (res.success) {
+				setMonuments(res.data.monuments || []);
+				setReviews(res.data.reviews || []);
+				if (res.data.monuments?.length > 0 && !activeTab) {
+					setActiveTab(res.data.monuments[0].id);
+				}
+			}
+		} catch (error) {
+			console.error("Failed to fetch feedback data:", error);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const handleDeleteReview = async (reviewId) => {
+		if (!window.confirm("Are you sure you want to permanently delete this review? This action cannot be undone.")) {
+			return;
+		}
+
+		setIsDeleting(reviewId);
+		try {
+			const res = await adminService.deleteReview(reviewId);
+			if (res.success) {
+				setReviews(reviews.filter(r => r.id !== reviewId));
+			} else {
+				alert("Failed to delete review: " + res.message);
+			}
+		} catch (error) {
+			console.error("Delete review error:", error);
+			alert("An error occurred while deleting the review.");
+		} finally {
+			setIsDeleting(null);
+		}
+	};
+
+	const activeReviews = reviews.filter(r => r.monumentId === activeTab);
 
 	if (loading) {
-		return <div className="p-12 text-center text-on-surface-variant">Loading feedback data...</div>;
+		return (
+			<div className="flex items-center justify-center min-h-[60vh]">
+				<div className="flex flex-col items-center gap-4">
+					<div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+					<p className="text-on-surface-variant font-bold animate-pulse">Syncing Community Narratives...</p>
+				</div>
+			</div>
+		);
 	}
 
 	return (
-		<main className="p-8 lg:p-12">
-			{/* Header */}
-			<div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-				<div>
-					<h1 className="font-serif text-5xl font-black text-on-background tracking-tight">
-						Feedback Hub
-					</h1>
-					<p className="text-on-surface-variant font-bold text-lg mt-2">
-						Reviewing community narratives and system accuracy.
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
-					<span className="material-symbols-outlined text-primary">
-						search
-					</span>
-					<input
-						type="text"
-						placeholder="Search feedback..."
-						className="px-4 py-2 bg-surface-container-low border-b-2 border-outline text-on-surface placeholder-on-surface-variant focus:border-primary focus:outline-none transition-colors"
-					/>
-				</div>
+		<main className="p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
+			{/* Precise Header */}
+			<div className="space-y-2">
+				<h1 className="font-serif text-5xl font-black text-on-background tracking-tighter">
+					Feedback <span className="text-primary">Hub</span>
+				</h1>
+				<p className="text-on-surface-variant font-medium text-lg">
+					Moderating community chronicles and sentiment archives.
+				</p>
 			</div>
 
-			{/* System Health */}
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-				{/* Overall Satisfaction */}
-				<div className="bg-surface-container-lowest p-6 rounded-xl shadow-lg">
-					<p className="font-label text-xs uppercase tracking-widest text-on-surface-variant font-bold mb-2">
-						System Health
-					</p>
-					<p className="font-serif text-5xl font-bold text-primary mb-1">
-						{data.systemHealth?.averageRating?.toFixed(1) || "0.0"}
-					</p>
-					<p className="text-sm text-on-surface-variant mb-4">/5.0 based on {data.systemHealth?.totalReviews || 0} reviews</p>
-					<p className="text-xs text-on-surface-variant">
-						Real-time system accuracy
-					</p>
-				</div>
-
-				{/* AI Model Precision */}
-				<div className="bg-primary/10 p-6 rounded-xl shadow-lg border border-primary">
-					<h3 className="font-serif text-lg font-bold text-primary mb-4">
-						AI Model Precision
-					</h3>
-					<div className="space-y-3">
-						<div>
-							<div className="flex justify-between mb-2">
-								<span className="text-xs font-bold uppercase text-on-surface-variant font-body">
-									Vision (CNN)
-								</span>
-								<span className="text-sm font-bold text-primary">
-									{data.systemHealth?.visionPrecision || 0}%
-								</span>
-							</div>
-							<div className="h-2 bg-surface-container rounded-full overflow-hidden">
-								<div className="h-full bg-primary" style={{ width: `${data.systemHealth?.visionPrecision || 0}%` }}></div>
-							</div>
-						</div>
-						<div>
-							<div className="flex justify-between mb-2">
-								<span className="text-xs font-bold uppercase text-on-surface-variant font-body">
-									Narrative (NTT)
-								</span>
-								<span className="text-sm font-bold text-primary">
-									{data.systemHealth?.narrativePrecision || 0}%
-								</span>
-							</div>
-							<div className="h-2 bg-surface-container rounded-full overflow-hidden">
-								<div className="h-full bg-primary" style={{ width: `${data.systemHealth?.narrativePrecision || 0}%` }}></div>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			{/* Recent Contributions */}
-			<div className="space-y-6">
-				<h2 className="font-serif text-2xl font-bold text-on-surface">
-					Recent Contributions
-				</h2>
-
-				{/* Filter Tabs */}
-				<div className="flex gap-2 flex-wrap">
-					<button 
-						onClick={() => setFilter("all")}
-						className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${filter === "all" ? "bg-primary text-white" : "bg-surface-container text-on-surface hover:bg-surface-container-high"}`}
-					>
-						All Reviews
-					</button>
-					<button 
-						onClick={() => setFilter("needs-attention")}
-						className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${filter === "needs-attention" ? "bg-primary text-white" : "bg-surface-container text-on-surface hover:bg-surface-container-high"}`}
-					>
-						Needs Attention
-					</button>
-				</div>
-
-				{/* Feedback Items */}
-				<div className="space-y-4">
-					{filteredFeedbacks.length === 0 ? (
-						<div className="py-8 text-center text-on-surface-variant">No feedback found.</div>
-					) : (
-						filteredFeedbacks.map((feedback) => (
-						<div
-							key={i}
-							className={`p-6 rounded-xl border-l-4 ${
-								feedback.sentiment === "positive"
-									? "bg-green-50 border-green-500"
-									: feedback.sentiment === "negative"
-										? "bg-red-50 border-red-500"
-										: "bg-surface-container-lowest border-outline"
+			{/* Monument Navigation Tabs */}
+			<div className="space-y-4">
+				<p className="font-label text-[10px] uppercase tracking-[0.3em] text-primary/60 font-black">Archive Repository</p>
+				<div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide no-scrollbar">
+					{monuments.map((m) => (
+						<button
+							key={m.id}
+							onClick={() => setActiveTab(m.id)}
+							className={`px-6 py-3 rounded-full text-xs font-black transition-all whitespace-nowrap border-2 ${
+								activeTab === m.id
+									? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105"
+									: "bg-surface-container-low text-on-surface-variant border-transparent hover:border-outline-variant"
 							}`}
 						>
-							<div className="flex justify-between items-start mb-3">
-								<div>
-									<p className="font-bold text-on-surface font-body">
-										{feedback.monument}
-									</p>
-									<p className="text-xs text-on-surface-variant font-body">
-										BY {feedback.author} • {feedback.time}
-									</p>
-								</div>
-								<span
-									className={`px-3 py-1 rounded-full text-xs font-bold ${
-										feedback.sentiment === "positive"
-											? "bg-green-100 text-green-700"
-											: feedback.sentiment === "negative"
-												? "bg-red-100 text-red-700"
-												: "bg-gray-100 text-gray-700"
-									}`}
-								>
-									{feedback.status}
-								</span>
-							</div>
+							{m.name}
+						</button>
+					))}
+				</div>
+			</div>
 
-							<div className="flex gap-1 mb-3">
-								{[...Array(5)].map((_, idx) => (
-									<span
-										key={idx}
-										className={`material-symbols-outlined ${idx < feedback.rating ? "text-secondary" : "text-outline"}`}
-									>
-										star
-									</span>
-								))}
-							</div>
-
-							<p className="text-sm text-on-surface-variant font-body italic mb-4">
-								"{feedback.content}"
-							</p>
-
-							<div className="flex gap-2">
-								<button className="text-xs font-bold text-primary hover:underline">
-									View Monument
-								</button>
-								<button className="text-xs font-bold text-primary hover:underline">
-									Flag
-								</button>
-								<button className="text-xs font-bold text-primary hover:underline">
-									Mark as Addressed
-								</button>
-							</div>
-						</div>
-					))
-					)}
+			{/* Content Moderation Stream */}
+			<div className="space-y-6">
+				<div className="flex items-center justify-between">
+					<h2 className="font-serif text-2xl font-bold text-on-surface">
+						{monuments.find(m => m.id === activeTab)?.name || "Select Monument"}
+						<span className="ml-3 text-sm font-sans font-medium text-on-surface-variant">
+							({activeReviews.length} Reviews)
+						</span>
+					</h2>
 				</div>
 
-				{/* Load More */}
-				<button className="w-full py-3 border-2 border-outline-variant text-on-surface-variant rounded-lg font-bold hover:bg-surface-container transition-all uppercase tracking-wider text-xs font-body">
-					Explore More Records
-				</button>
+				<div className="grid grid-cols-1 gap-4">
+					{activeReviews.length === 0 ? (
+						<div className="py-20 text-center bg-surface-container-lowest rounded-[2rem] border-2 border-dashed border-outline-variant">
+							<span className="material-symbols-outlined text-4xl text-outline-variant mb-4">inbox</span>
+							<p className="text-on-surface-variant font-bold">No narratives found for this monument.</p>
+						</div>
+					) : (
+						activeReviews.map((review) => (
+							<div
+								key={review.id}
+								className="group bg-surface/40 backdrop-blur-md border border-white/10 rounded-[2rem] p-8 shadow-xl hover:shadow-2xl hover:bg-surface/60 transition-all duration-500 flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
+							>
+								<div className="space-y-4 flex-1">
+									<div className="flex items-center gap-4">
+										<div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+											<span className="text-primary font-black text-sm">{(review.author || "U")[0]}</span>
+										</div>
+										<div>
+											<p className="font-bold text-on-surface">{review.author || "Unknown Historian"}</p>
+											<p className="text-[10px] uppercase tracking-widest text-on-surface-variant font-black">
+												{review.date ? new Date(review.date).toLocaleDateString('en-US', { 
+													month: 'short', 
+													day: 'numeric', 
+													year: 'numeric' 
+												}) : "Date Unknown"}
+											</p>
+										</div>
+									</div>
+
+									<div className="flex gap-1">
+										{[...Array(5)].map((_, idx) => (
+											<span
+												key={idx}
+												className={`material-symbols-outlined text-sm ${
+													idx < review.rating ? "text-primary filled" : "text-outline-variant"
+												}`}
+											>
+												star
+											</span>
+										))}
+									</div>
+
+									<p className="text-on-surface-variant font-medium leading-relaxed italic border-l-4 border-primary/20 pl-4 py-1">
+										"{review.comment}"
+									</p>
+								</div>
+
+								<button
+									onClick={() => handleDeleteReview(review.id)}
+									disabled={isDeleting === review.id}
+									className="group/btn relative px-6 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-full transition-all duration-300 flex items-center gap-2 overflow-hidden"
+								>
+									{isDeleting === review.id ? (
+										<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+									) : (
+										<>
+											<span className="material-symbols-outlined text-sm group-hover/btn:rotate-12 transition-transform">delete</span>
+											<span className="text-xs font-black uppercase tracking-widest">Delete Narrative</span>
+										</>
+									)}
+								</button>
+							</div>
+						))
+					)}
+				</div>
 			</div>
 		</main>
 	);

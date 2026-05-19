@@ -113,7 +113,7 @@ export default function Home() {
 						SCAN NOW
 					</Link> */}
 					<Link
-						to="/monument/1"
+						to="/monuments"
 						className="px-8 py-4 bg-surface-container text-primary font-bold rounded-xl hover:bg-surface-container-high transition-all"
 					>
 						Explore Monuments

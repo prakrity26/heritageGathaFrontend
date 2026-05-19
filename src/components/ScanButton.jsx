@@ -1,7 +1,9 @@
 import { useRef, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Webcam from "react-webcam";
+import { toast } from "react-hot-toast";
 import API_CONFIG from "../services/api.config";
+import httpClient from "../services/http.client";
 
 /**
  * ---------------------------------------------------------------------------
@@ -48,6 +50,7 @@ import API_CONFIG from "../services/api.config";
 
 export default function ScanButton() {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const webcamRef = useRef(null);
 	const canvasRef = useRef(null);
 	const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -68,6 +71,15 @@ export default function ScanButton() {
 		}));
 		setParticles(generatedParticles);
 	}, []);
+
+	// Auto-open scanner if navigated back with autoOpenScanner state
+	useEffect(() => {
+		if (location.state?.autoOpenScanner) {
+			// Clear state context so it doesn't reopen unexpectedly
+			navigate(location.pathname, { replace: true, state: {} });
+			handleScanClick();
+		}
+	}, [location.state, navigate]);
 
 	const handleScanClick = async () => {
 		try {
@@ -156,24 +168,34 @@ export default function ScanButton() {
 			// 2. Convert base64 to Blob
 			const response = await fetch(capturedImage);
 			const blob = await response.blob();
-			
+
 			// 3. Prepare FormData
 			const formData = new FormData();
-			formData.append("image", blob, "monument-scan.jpg");
 			formData.append("userLat", latitude);
 			formData.append("userLng", longitude);
+			formData.append("image", blob, "monument-scan.jpg");
 
-			// 4. Send to Backend using native fetch (since it's a public multipart request)
-			const apiUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.VISION.ANALYZE}`;
-			const apiRes = await fetch(apiUrl, {
-				method: "POST",
-				body: formData,
-			});
+			// 4. Send to Backend using httpClient (to ensure Auth headers are included)
+			const endpoint = API_CONFIG.ENDPOINTS.VISION.ANALYZE;
+			const result = await httpClient.post(endpoint, formData);
 
-			const result = await apiRes.json();
+			if (result.status === "error" || !result.data) {
+				const errorMsg = result.message || "Identification failed. Please try again.";
+				
+				// Reset scanner state and restore scrolling
+				setIsCameraOpen(false);
+				setCapturedImage(null);
+				setAnalysisResult(null);
+				document.body.style.overflow = "unset";
+				document.documentElement.style.overflow = "unset";
+				document.body.classList.remove("camera-open");
 
-			if (!apiRes.ok || result.status !== "success") {
-				setError(result.message || result.error || "Identification failed. Please try again.");
+				navigate("/scan-error", {
+					state: {
+						errorType: "UNRECOGNIZED",
+						message: errorMsg
+					}
+				});
 				return;
 			}
 
@@ -183,14 +205,69 @@ export default function ScanButton() {
 				data: {
 					monument_id: result.data.monument.id,
 					name: result.data.monument.name,
-					confidence_score: result.data.confidence,
-					distance: result.data.distance
+					confidence_score: result.data.confidence || 0.9,
+					distance: result.data.distance || 0
 				},
 			});
 
 		} catch (err) {
 			console.error("Analysis API failed:", err);
-			setError(err.message || "Network error. Please try again.");
+			
+			if (err.status === 401) {
+				// Clear tokens so subsequent requests don't fail
+				localStorage.removeItem("accessToken");
+				localStorage.removeItem("refreshToken");
+				
+				// Reset scanner state and restore scrolling
+				setIsCameraOpen(false);
+				setCapturedImage(null);
+				setAnalysisResult(null);
+				document.body.style.overflow = "unset";
+				document.documentElement.style.overflow = "unset";
+				document.body.classList.remove("camera-open");
+
+				toast.error("Your session has expired. Please log in again.");
+				navigate("/login");
+				return;
+			}
+			
+			let errorType = "UNRECOGNIZED";
+			let errorMsg = "We could not recognize the monument. Please try to capture the monument or be physically present to the monument.";
+			let extraInfo = {};
+
+			if (err.status === 400 && err.response) {
+				if (err.response.error === "GEOFENCE_VIOLATION") {
+					errorType = "GEOFENCE";
+					errorMsg = err.response.message || "You seem to be too far from this monument.";
+					extraInfo = { distance: err.response.distance };
+				} else if (err.response.error === "MONUMENT_NOT_FOUND") {
+					errorType = "UNRECOGNIZED";
+					errorMsg = "We could not recognize the monument. Please ensure you are capturing a supported heritage monument.";
+				} else {
+					errorMsg = err.response.message || errorMsg;
+				}
+			} else if (err.status === 404) {
+				errorType = "UNRECOGNIZED";
+				errorMsg = err.response?.message || "No monument detected with sufficient confidence. Please center the monument in your shot.";
+			} else {
+				errorMsg = err.message || errorMsg;
+			}
+
+			// Reset scanner state and restore scrolling
+			setIsCameraOpen(false);
+			setCapturedImage(null);
+			setAnalysisResult(null);
+			document.body.style.overflow = "unset";
+			document.documentElement.style.overflow = "unset";
+			document.body.classList.remove("camera-open");
+
+			navigate("/scan-error", {
+				state: {
+					errorType,
+					message: errorMsg,
+					...extraInfo
+				}
+			});
 		} finally {
 			setIsAnalyzing(false);
 		}
@@ -338,14 +415,14 @@ export default function ScanButton() {
 										<h3 className="text-gray-900 font-bold text-xl mb-1">
 											{analysisResult.data.name}
 										</h3>
-										<p className="text-gray-600 font-medium mb-4 text-sm">
+										{/* <p className="text-gray-600 font-medium mb-4 text-sm">
 											Confidence:{" "}
 											{Math.round(
 												analysisResult.data
 													.confidence_score * 100,
 											)}
 											% Match
-										</p>
+										</p> */}
 										<div className="flex gap-3 justify-center">
 											<button
 												onClick={retakePhoto} // Or link to the monument page manually
